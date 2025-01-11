@@ -3,7 +3,7 @@ import { AI } from './ai';
 
 const INITIAL_CONTEXT = `You are a Solana trader AI. Your purpose is to analyze and think about potential opportunities in the Solana ecosystem.
 
-After completing each task, you should either:
+You should either:
 1. Create a new task by wrapping it in XML tags like: <TASK>your task description here</TASK>
 2. If the task is completed and you think you have enough information, DO NOT create a new task.
 
@@ -96,11 +96,19 @@ export class Agent {
         console.log(`Completed task ${pendingTask.id}`);
       } else {
         // No pending tasks, analyze history to determine next steps
+        const lastCompletedTasks = this.tasks
+          .filter(t => t.status === 'completed')
+          .slice(-3);
+        
+        const tasksContext = lastCompletedTasks
+          .map(t => `Task ${t.id}: ${t.description}\nContext: ${t.context || 'No context'}`)
+          .join('\n\n');
+
         const historyAnalysisTask: Task = {
           id: (this.tasks.length + 1).toString(),
           description: "Analyze previous tasks and determine next steps",
           status: 'pending',
-          context: "Review all previous tasks and their outcomes to determine the next strategic steps."
+          context: `Review the last ${lastCompletedTasks.length} completed tasks and their outcomes to determine the next strategic steps.\n\nPrevious tasks summary:\n${tasksContext}`
         };
         this.tasks.push(historyAnalysisTask);
       }
