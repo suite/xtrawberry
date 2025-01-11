@@ -10,10 +10,11 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.33.1"
   },
   "devDependencies": {
     "typescript": "^5.3.3",
     "bun-types": "latest",
     "@types/node": "^20.10.5"
   }
-} 
+}
