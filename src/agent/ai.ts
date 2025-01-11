@@ -60,16 +60,10 @@ export class AI {
       content,
     });
 
-    // Create the messages array for the API call
-    const messages = conversation.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
     try {
       const response = await this.client.messages.create({
         model: this.model,
-        messages,
+        messages: conversation.messages,
         max_tokens: 1024,
       });
 
