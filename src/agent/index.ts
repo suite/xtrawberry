@@ -9,6 +9,21 @@ You should either:
 
 Respond with your thoughts and explicitly state any new tasks that should be created.`;
 
+/*
+Available commands:
+for each plugin:
+  command , params
+
+{
+  name: "demo",
+  params: [
+    input: string
+  ]
+}
+
+execute with <EXEC PLUGIN="name" COMMAND="PRINT" INPUT="LOL">
+*/
+
 interface Task {
   id: string;
   description: string;
