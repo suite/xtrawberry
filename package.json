@@ -1,0 +1,19 @@
+{
+  "name": "xtrawberry",
+  "version": "0.1.0",
+  "description": "AI agent framework for market opportunities on X.com",
+  "type": "module",
+  "scripts": {
+    "start": "bun run build && bun run dist/agent/index.js",
+    "dev": "bun run src/agent/index.ts",
+    "build": "tsc",
+    "test": "bun test"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "bun-types": "latest",
+    "@types/node": "^20.10.5"
+  }
+} 
