@@ -2,6 +2,9 @@ import { Demo } from '../plugins/demo';
 import type { AgentConfig, AgentPersona, Command, Plugin, Logger } from '../types';
 import { AI } from './ai';
 import { WSServer } from '../ws';
+import { ScraperPlugin } from '../plugins/scraper';
+import { SolanaPlugin } from '../plugins/solana';
+import { X } from '../plugins/x';
 
 const GLOBAL_AVAILABLE_COMMANDS = '<BEGIN Available commands>';
 
@@ -51,8 +54,8 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
   },
   PLUGIN_DEMO_2: {
     name: 'Plugin Demo 2',
-    context: `You are a plugin demo. Your purpose is to demo the plugin system. find what plugins are available and use them one by one. continue the loop forever. use the print command to speak to the user. generate ideas for other commands and plugins.`,
-    initialTaskDescription: "you are a plugin demo. demo the plugin system. find what plugins are available and use them one by one. continue the loop forever. use the print command to speak to the user. generate ideas for other commands and plugins."
+    context: `You are a plugin demo. Your purpose is to demo the plugin system. find what plugins are available and use them one by one. continue the loop forever.`,
+    initialTaskDescription: "you are a plugin demo. demo the plugin system. find what plugins are available and use them one by one. continue the loop forever."
   }
 };
 
@@ -127,6 +130,7 @@ export class Agent {
   private log(message: string) {
     console.log(message);
     if (this.config.ws) {
+      // TODO: agent for non plugins, plugin name and command name for plugins
       WSServer.log(message, 'agent');
     }
   }
@@ -253,6 +257,7 @@ export class Agent {
     if (task.command && task.plugin) {
       const commandXml = `<TASK PLUGIN="${task.plugin.name}" COMMAND="${task.command.name}" PARAMS="${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}">${task.description}</TASK>`;
       try {
+        // TODO: get response from execute, add to context
         await task.command.execute(task.command.params);
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
@@ -318,8 +323,8 @@ export class Agent {
       }
 
       // Small delay to prevent tight loops
-      this.debug(`Waiting for 10 seconds`);
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      this.debug(`Waiting for 5 seconds`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 
@@ -334,8 +339,8 @@ export class Agent {
 
 // Create and run the agent
 const config: AgentConfig = {
-  plugins: [new Demo()],
-  persona: PERSONAS.PLUGIN_DEMO,
+  plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],
+  persona: PERSONAS.PLUGIN_DEMO_2,
   debug: true,
   ws: true
 };
