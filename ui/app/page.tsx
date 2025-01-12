@@ -10,30 +10,43 @@ type Message = {
 };
 
 const CHANNEL = 'xtrawberry';
+const RETRY_INTERVAL = 5000;
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8080');
-    
-    ws.onopen = () => {
-      setStatus('connected');
+    let ws: WebSocket | null = null;
+    let retryTimeout: NodeJS.Timeout;
+
+    const connect = () => {
+      ws = new WebSocket('ws://localhost:8080');
+      
+      ws.onopen = () => {
+        setStatus('connected');
+      };
+
+      ws.onclose = () => {
+        setStatus('disconnected');
+        // Schedule reconnection after RETRY_INTERVAL
+        retryTimeout = setTimeout(connect, RETRY_INTERVAL);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log(data);
+        setMessages(prev => [...prev, data]);
+      };
     };
 
-    ws.onclose = () => {
-      setStatus('disconnected');
-    };
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log(data);
-      setMessages(prev => [...prev, data]);
-    };
+    connect();
 
     return () => {
-      ws.close();
+      if (ws) {
+        ws.close();
+      }
+      clearTimeout(retryTimeout);
     };
   }, []);
 
