@@ -138,7 +138,7 @@ export class Agent {
   private log(message: string, plugin?: Plugin) {
     console.log(message);
     if (this.config.ws) {
-      WSServer.log(message, plugin?.name || 'agent');
+      WSServer.log(message, plugin?.name || `agent - ${this.currentPersona.name}`);
     }
   }
 
