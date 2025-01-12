@@ -266,7 +266,7 @@ export class Agent {
     if (task.command && task.plugin) {
       const commandXml = `<TASK PLUGIN="${task.plugin.name}" COMMAND="${task.command.name}" PARAMS="${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}">${task.description}</TASK>`;
       try {
-        // TODO: get response from execute, add to context
+        // TODO: get response from execute, add to context, make last 10 results available and made obvious to read
         await task.command.execute(task.command.params);
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
