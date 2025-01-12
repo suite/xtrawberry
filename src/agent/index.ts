@@ -1,6 +1,7 @@
 import { Demo } from '../plugins/demo';
-import type { AgentConfig, AgentPersona, Command, Plugin } from '../types';
+import type { AgentConfig, AgentPersona, Command, Plugin, Logger } from '../types';
 import { AI } from './ai';
+import { WSServer } from '../ws';
 
 const GLOBAL_AVAILABLE_COMMANDS = '<BEGIN Available commands>';
 
@@ -29,7 +30,7 @@ ONLY USE THE CONTEXT GIVEN AND THE PLUGIN COMMANDS TO CREATE NEW TASKS.
 export const PERSONAS: Record<string, AgentPersona> = {
   SOLANA_TRADER: {
     name: 'Solana Trader',
-    initialContext: `You are a Solana trader AI. Your purpose is to analyze and think about potential opportunities in the Solana ecosystem.
+    context: `You are a Solana trader AI. Your purpose is to analyze and think about potential opportunities in the Solana ecosystem.
 
 You should either:
 1. Create a new task 
@@ -45,8 +46,13 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
   },
   PLUGIN_DEMO: {
     name: 'Plugin Demo',
-    initialContext: `You are a plugin demo. Your purpose is to demo the plugin system. Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK.`,
+    context: `You are a plugin demo. Your purpose is to demo the plugin system. Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK.`,
     initialTaskDescription: "you are a plugin demo. demo the plugin system. use the demo plugin to print 'LOL' to the console. after that, print a joke, then print 3 prime numbers.  Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK."
+  },
+  PLUGIN_DEMO_2: {
+    name: 'Plugin Demo 2',
+    context: `You are a plugin demo. Your purpose is to demo the plugin system. find what plugins are available and use them one by one. continue the loop forever. use the print command to speak to the user. generate ideas for other commands and plugins.`,
+    initialTaskDescription: "you are a plugin demo. demo the plugin system. find what plugins are available and use them one by one. continue the loop forever. use the print command to speak to the user. generate ideas for other commands and plugins."
   }
 };
 
@@ -81,17 +87,26 @@ export class Agent {
   private ai: AI;
   private PLUGIN_CONTEXT: string;
   private currentPersona: AgentPersona;
+  private logger: Logger;
 
   constructor(config: AgentConfig) {
-    this.config = { debug: false, ...config };
+    this.config = { debug: false, ws: false, ...config };
     this.ai = new AI();
     this.currentPersona = config.persona || PERSONAS.SOLANA_TRADER;
-    this.currentPersona.initialContext = `${this.currentPersona.initialContext}\n\n${GLOBAL_CONTEXT}`;
+    this.currentPersona.context = `${this.currentPersona.context}\n\n${GLOBAL_CONTEXT}`;
+
+    // Create logger object
+    this.logger = {
+      debug: (message: string) => this.debug(message),
+      warn: (message: string) => this.warn(message),
+      error: (message: string, err?: any) => this.error(message, err),
+      log: (message: string) => this.log(message)
+    };
 
     this.PLUGIN_CONTEXT = `${GLOBAL_AVAILABLE_COMMANDS}`;
 
     this.config.plugins.forEach(plugin => {
-      plugin.initialize();
+      plugin.initialize(this.logger); // TODO: maybe pass in entire agent
       this.PLUGIN_CONTEXT += `\n${JSON.stringify(plugin)}`;
     });
 
@@ -102,23 +117,44 @@ export class Agent {
       description: this.currentPersona.initialTaskDescription,
       status: 'pending'
     }];
+
+    // Start WebSocket server if enabled
+    if (this.config.ws) {
+      WSServer.start();
+    }
+  }
+
+  private log(message: string) {
+    console.log(message);
+    if (this.config.ws) {
+      WSServer.log(message, 'agent');
+    }
   }
 
   private debug(message: string) {
     if (this.config.debug) {
       console.log(message);
+      // if (this.config.ws) {
+      //   WSServer.log(message);
+      // }
     }
   }
 
   private warn(message: string) {
     if (this.config.debug) {
       console.warn(message);
+      // if (this.config.ws) {
+      //   WSServer.warn(message);
+      // }
     }
   }
 
   private error(message: string, err?: any) {
     if (this.config.debug) {
       console.error(message, err);
+      // if (this.config.ws) {
+      //   WSServer.error(message, err);
+      // }
     }
   }
 
@@ -144,7 +180,7 @@ export class Agent {
 
     // Parse plugin tasks
     while ((match = pluginRegex.exec(response)) !== null) {
-      console.log(`-------------------------------FOUND PLUGIN TASK: ${match}-------------------------------`);
+      this.debug(`-------------------------------FOUND PLUGIN TASK: ${match}-------------------------------`);
       const [_, pluginName, command, params, description] = match;
       
       // Validate plugin exists
@@ -209,6 +245,7 @@ export class Agent {
 
   private async executeTask(task: Task): Promise<void> {
     this.debug(`[${task.id}] Executing task: ${task.description}`);
+    this.log(`${task.description}`);
     task.status = 'in_progress';
 
     // Execute command if present
@@ -229,14 +266,13 @@ export class Agent {
     
     this.ai.createConversation(conversationId, task.id);
 
-    const message = `${this.currentPersona.initialContext}\n\n${this.PLUGIN_CONTEXT}\n\n${
+    const message = `${this.currentPersona.context}\n\n${this.PLUGIN_CONTEXT}\n\n${
       task.id === '1' 
         ? `Your first task: ${task.description}`
         : `Current task: ${task.description}${task.context ? `\n\nContext from previous task: ${task.context}` : ''}${commandExecutionStatus}`
     }`;
 
     this.debug(`[${task.id}] Sending message to AI: ${message}`);
-    console.log(`[${task.id}] Sending message to AI: ${message}`);
 
     const response = await this.ai.sendMessage(conversationId, message);
 
@@ -249,6 +285,7 @@ export class Agent {
     newTasks.forEach(task => this.addTask(task));
 
     task.status = 'completed';
+    this.debug(`Completed task ${task.id}`); 
   }
 
   async start() {
@@ -259,10 +296,9 @@ export class Agent {
       const pendingTask = this.tasks.find(t => t.status === 'pending');
       
       if (pendingTask) {
-        this.debug(`Executing task ${pendingTask.id}: ${pendingTask.description}`);
         await this.executeTask(pendingTask);
-        this.debug(`Completed task ${pendingTask.id}`); 
       } else {
+        this.log(`No pending tasks, analyzing history`);
         // No pending tasks, analyze history to determine next steps
         const lastCompletedTasks = this.tasks
           .filter(t => t.status === 'completed')
@@ -289,6 +325,9 @@ export class Agent {
 
   stop() {
     this.isRunning = false;
+    if (this.config.ws) {
+      WSServer.stop();
+    }
     this.debug('Agent stopped');
   }
 }
@@ -297,7 +336,8 @@ export class Agent {
 const config: AgentConfig = {
   plugins: [new Demo()],
   persona: PERSONAS.PLUGIN_DEMO,
-  debug: false
+  debug: true,
+  ws: true
 };
 
 const agent = new Agent(config);

@@ -1,3 +1,10 @@
+export interface Logger {
+  debug(message: string): void;
+  warn(message: string): void;
+  error(message: string, err?: any): void;
+  log(message: string): void;
+}
+
 export interface Command {
   name: string;
   description: string;
@@ -7,13 +14,14 @@ export interface Command {
 
 export interface Plugin {
   name: string;
-  initialize(): Promise<void>;
+  initialize(logger: Logger): Promise<void>;
   commands: Record<string, Command>;
+  logger?: Logger; // TODO: make required
 }
 
 export interface AgentPersona {
   name: string;
-  initialContext: string;
+  context: string;
   initialTaskDescription: string;
 }
 
@@ -21,4 +29,5 @@ export interface AgentConfig {
   plugins: Plugin[];
   persona?: AgentPersona;
   debug?: boolean;
+  ws?: boolean;
 } 

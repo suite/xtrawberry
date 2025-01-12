@@ -1,4 +1,4 @@
-import type { Plugin } from '../../types';
+import type { Logger, Plugin } from '../../types';
 
 export class X implements Plugin {
   name = 'x';
