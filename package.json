@@ -6,8 +6,9 @@
   "scripts": {
     "start": "bun run build && bun run dist/agent/index.js",
     "dev": "bun run src/agent/index.ts",
-    "build": "tsc",
-    "test": "bun test"
+    "build": "tsc", 
+    "test": "bun test",
+    "dev:ui": "cd ui && bun dev"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.33.1"
