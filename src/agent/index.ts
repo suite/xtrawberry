@@ -59,21 +59,6 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
   }
 };
 
-/*
-Available commands:
-for each plugin:
-  command , params
-
-{
-  name: "demo",
-  params: [
-    input: string
-  ]
-}
-
-execute with <EXEC PLUGIN="name" COMMAND="PRINT" INPUT="LOL">
-*/
-
 interface Task {
   id: string;
   description: string;
@@ -98,7 +83,6 @@ export class Agent {
     this.currentPersona = config.persona || PERSONAS.SOLANA_TRADER;
     this.currentPersona.context = `${this.currentPersona.context}\n\n${GLOBAL_CONTEXT}`;
 
-    // Create logger object
     this.logger = {
       debug: (message: string) => this.debug(message),
       warn: (message: string) => this.warn(message),
@@ -145,27 +129,18 @@ export class Agent {
   private debug(message: string) {
     if (this.config.debug) {
       console.log(message);
-      // if (this.config.ws) {
-      //   WSServer.log(message);
-      // }
     }
   }
 
   private warn(message: string) {
     if (this.config.debug) {
       console.warn(message);
-      // if (this.config.ws) {
-      //   WSServer.warn(message);
-      // }
     }
   }
 
   private error(message: string, err?: any) {
     if (this.config.debug) {
       console.error(message, err);
-      // if (this.config.ws) {
-      //   WSServer.error(message, err);
-      // }
     }
   }
 
@@ -313,8 +288,9 @@ export class Agent {
       if (pendingTask) {
         await this.executeTask(pendingTask);
       } else {
-        this.log(`No pending tasks, analyzing history`);
         // No pending tasks, analyze history to determine next steps
+        this.log(`No pending tasks, analyzing history`);
+      
         const lastCompletedTasks = this.tasks
           .filter(t => t.status === 'completed')
           .slice(-3);
