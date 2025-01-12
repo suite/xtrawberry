@@ -10,14 +10,14 @@ const GLOBAL_AVAILABLE_COMMANDS = '<BEGIN Available commands>';
 
 const GLOBAL_CONTEXT = `
 Example Plugin Usage:
-to execute a plugin command, wrap it in XML tags like: <TASK PLUGIN="name" COMMAND="command" PARAMS="params">task description</TASK>
-<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
+to execute a plugin command, wrap it in XML tags like: <TASK> <PLUGIN>name</PLUGIN> <COMMAND>command</COMMAND> <PARAMS><param_name>param_value</param_name></PARAMS> <DESCRIPTION>task description</DESCRIPTION> </TASK>
+<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
 
 REMEMBER:
-1. If you want the next task to execute a plugin command, wrap it in XML tags like: <TASK PLUGIN="name" COMMAND="command" PARAMS="params">task description</TASK>
-1.1 example: <TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
+1. If you want the next task to execute a plugin command, wrap it in XML tags like: <TASK> <PLUGIN>name</PLUGIN> <COMMAND>command</COMMAND> <PARAMS><param_name>param_value</param_name></PARAMS> <DESCRIPTION>task description</DESCRIPTION> </TASK>
+1.1 example: <TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
 
-2. If you want the next task to be a normal task, without executing a plugin command, wrap it in XML tags like: <TASK>task description</TASK>
+2. If you want the next task to be a normal task, without executing a plugin command, wrap it in XML tags like: <TASK> <DESCRIPTION>task description</DESCRIPTION> </TASK>
 
 YOU CAN USE MULTIPLE PLUGINS IN THE SAME TASK. YOU CAN USE MULTIPLE COMMANDS IN THE SAME TASK.
 
@@ -30,6 +30,20 @@ NEVER ASK QUESTIONS FROM THE USER. NEVER ASK QUESTIONS FROM THE USER. NEVER ASK 
 ONLY USE THE CONTEXT GIVEN AND THE PLUGIN COMMANDS TO CREATE NEW TASKS.
 `;
 
+/*
+<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
+=
+<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
+
+<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL,example=DERP">Print LOL to the console</TASK>
+=
+<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input><example>DERP</example></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
+
+
+<TASK>task description</TASK>
+=
+<TASK> <DESCRIPTION>task description</DESCRIPTION> </TASK>
+*/
 export const PERSONAS: Record<string, AgentPersona> = {
   SOLANA_TRADER: {
     name: 'Solana Trader',
@@ -37,10 +51,10 @@ export const PERSONAS: Record<string, AgentPersona> = {
 
 You should either:
 1. Create a new task 
-1.1 If you want the next task to execute a plugin command, wrap it in XML tags like: <TASK PLUGIN="name" COMMAND="command" PARAMS="params">task description</TASK>
-1.1 example: <TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
+1.1 If you want the next task to execute a plugin command, wrap it in XML tags like: <TASK> <PLUGIN>name</PLUGIN> <COMMAND>command</COMMAND> <PARAMS><param_name>param_value</param_name></PARAMS> <DESCRIPTION>task description</DESCRIPTION> </TASK>
+1.1 example: <TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
 
-1.2 If you want the next task to be a normal task, without executing a plugin command, wrap it in XML tags like: <TASK>task description</TASK>
+1.2 If you want the next task to be a normal task, without executing a plugin command, wrap it in XML tags like: <TASK> <DESCRIPTION>task description</DESCRIPTION> </TASK>
 
 2. If the task is completed and you think you have enough information, DO NOT create a new task.
 
@@ -49,8 +63,8 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
   },
   PLUGIN_DEMO: {
     name: 'Plugin Demo',
-    context: `You are a plugin demo. Your purpose is to demo the plugin system. Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK.`,
-    initialTaskDescription: "you are a plugin demo. demo the plugin system. use the demo plugin to print 'LOL' to the console. after that, print a joke, then print 3 prime numbers.  Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK."
+    context: `you are a plugin demo. demo the plugin system. use the demo plugin to print 'LOL' to the console. after that, print a joke, then print 3 prime numbers.  Once done keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED EXCEPT FOR THE DONE TASK.`,
+    initialTaskDescription: "you are a plugin demo. demo the plugin system. use the demo plugin to print 'LOL' to the console. after that, print a joke, then print 3 prime numbers.  Once done keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED EXCEPT FOR THE DONE TASK."
   },
   PLUGIN_DEMO_2: {
     name: 'Plugin Demo 2',
@@ -96,10 +110,10 @@ export class Agent {
       plugin.initialize(this.logger); // TODO: maybe pass in entire agent
       const commandsXml = Object.entries(plugin.commands)
         .map(([name, cmd]) => {
-          const paramsStr = Object.entries(cmd.params)
-            .map(([paramName, defaultValue]) => `${paramName}=${defaultValue}`)
-            .join(',');
-          return `<TASK PLUGIN="${plugin.name}" COMMAND="${name}" PARAMS="${paramsStr}">${cmd.description}</TASK>`;
+          const paramsXml = Object.entries(cmd.params)
+            .map(([paramName, defaultValue]) => `<${paramName}>${defaultValue}</${paramName}>`)
+            .join('');
+          return `<TASK> <PLUGIN>${plugin.name}</PLUGIN> <COMMAND>${name}</COMMAND> <PARAMS>${paramsXml}</PARAMS> <DESCRIPTION>${cmd.description}</DESCRIPTION> </TASK>`;
         })
         .join('\n');
       this.PLUGIN_CONTEXT += `\n${commandsXml}`;
@@ -160,67 +174,90 @@ export class Agent {
 
   private parseNewTasks(response: string): Task[] {
     const tasks: Task[] = [];
-    const pluginRegex = /<TASK PLUGIN="(.*?)" COMMAND="(.*?)" PARAMS="(.*?)">(.*?)<\/TASK>/g;
-    const normalRegex = /<TASK>(.*?)<\/TASK>/g;
+    const taskRegex = /<TASK>\s*(.*?)\s*<\/TASK>/gs;
     let match;
 
-    // Parse plugin tasks
-    while ((match = pluginRegex.exec(response)) !== null) {
-      this.debug(`-------------------------------FOUND PLUGIN TASK: ${match}-------------------------------`);
-      const [_, pluginName, command, params, description] = match;
+    while ((match = taskRegex.exec(response)) !== null) {
+      const taskContent = match[1];
       
-      // Validate plugin exists
-      const plugin = this.config.plugins.find(p => p.name === pluginName);
-      if (!plugin) {
-        this.warn(`Plugin ${pluginName} not found, skipping task`);
-        continue;
-      }
+      // Check if this is a plugin task or normal task
+      const pluginMatch = taskContent.match(/<PLUGIN>(.*?)<\/PLUGIN>/);
+      
+      if (pluginMatch) {
+        // This is a plugin task
+        const pluginName = pluginMatch[1];
+        const commandMatch = taskContent.match(/<COMMAND>(.*?)<\/COMMAND>/);
+        const paramsMatch = taskContent.match(/<PARAMS>(.*?)<\/PARAMS>/s);
+        const descriptionMatch = taskContent.match(/<DESCRIPTION>(.*?)<\/DESCRIPTION>/);
 
-      // Validate command exists
-      if (!plugin.commands[command]) {
-        this.warn(`Command ${command} not found in plugin ${pluginName}, skipping task`);
-        continue;
-      }
-
-      // Parse params
-      let parsedParams: Record<string, any> = {};
-      try {
-        if (params.trim()) {  // Only parse if params is non-empty
-          params.split(',').forEach(param => {
-            const [key, value] = param.split('=');
-            parsedParams[key.trim()] = value.trim();
-          });
+        if (!commandMatch || !descriptionMatch) {
+          this.warn('Invalid plugin task format, missing command or description');
+          continue;
         }
-      } catch (e) {
-        this.warn(`Invalid params format for task: ${description}, skipping`);
-        continue;
+
+        const command = commandMatch[1];
+        const description = descriptionMatch[1].trim();
+
+        // Validate plugin exists
+        const plugin = this.config.plugins.find(p => p.name === pluginName);
+        if (!plugin) {
+          this.warn(`Plugin ${pluginName} not found, skipping task`);
+          continue;
+        }
+
+        // Validate command exists
+        if (!plugin.commands[command]) {
+          this.warn(`Command ${command} not found in plugin ${pluginName}, skipping task`);
+          continue;
+        }
+
+        // Parse params
+        let parsedParams: Record<string, any> = {};
+        try {
+          if (paramsMatch) {
+            const paramsContent = paramsMatch[1];
+            const paramRegex = /<(\w+)>(.*?)<\/\1>/g;
+            let paramMatch;
+            while ((paramMatch = paramRegex.exec(paramsContent)) !== null) {
+              const [_, paramName, paramValue] = paramMatch;
+              parsedParams[paramName] = paramValue;
+            }
+          }
+        } catch (e) {
+          this.warn(`Invalid params format for task: ${description}, skipping`);
+          continue;
+        }
+
+        const task: Task = {
+          id: (this.tasks.length + tasks.length + 1).toString(),
+          description,
+          status: 'pending',
+          context: response,
+          command: {
+            name: command,
+            params: parsedParams,
+            execute: plugin.commands[command].execute
+          },
+          plugin
+        };
+
+        tasks.push(task);
+      } else {
+        // This is a normal task
+        const descriptionMatch = taskContent.match(/<DESCRIPTION>(.*?)<\/DESCRIPTION>/);
+        if (!descriptionMatch) {
+          this.warn('Invalid task format, missing description');
+          continue;
+        }
+
+        const task: Task = {
+          id: (this.tasks.length + tasks.length + 1).toString(),
+          description: descriptionMatch[1].trim(),
+          status: 'pending',
+          context: response
+        };
+        tasks.push(task);
       }
-
-      const task: Task = {
-        id: (this.tasks.length + tasks.length + 1).toString(),
-        description: description.trim(),
-        status: 'pending',
-        context: response,
-        command: {
-          name: command,
-          params: parsedParams,
-          execute: plugin.commands[command].execute
-        },
-        plugin
-      };
-
-      tasks.push(task);
-    }
-
-    // Parse normal tasks
-    while ((match = normalRegex.exec(response)) !== null) {
-      const task: Task = {
-        id: (this.tasks.length + tasks.length + 1).toString(),
-        description: match[1].trim(),
-        status: 'pending',
-        context: response
-      };
-      tasks.push(task);
     }
 
     return tasks;
@@ -326,7 +363,7 @@ export class Agent {
 // Create and run the agent
 const config: AgentConfig = {
   plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],
-  persona: PERSONAS.SOLANA_TRADER,
+  persona: PERSONAS.PLUGIN_DEMO,
   debug: true,
   ws: true
 };
