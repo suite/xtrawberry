@@ -10,7 +10,7 @@ type Message = {
 };
 
 const CHANNEL = 'xtrawberry';
-const RETRY_INTERVAL = 5000;
+const RETRY_INTERVAL = 5000; // TODO: RETRY MIGHT BE BUGGING
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
