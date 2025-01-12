@@ -50,7 +50,7 @@ export class WSServer {
   }
 
   public static log(message: string, type: string = 'log'): void {
-    console.log(message);
+    console.log(`[${type}] ${message}`);
     this.broadcast({ type, message });
   }
 

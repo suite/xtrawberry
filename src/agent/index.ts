@@ -103,14 +103,22 @@ export class Agent {
       debug: (message: string) => this.debug(message),
       warn: (message: string) => this.warn(message),
       error: (message: string, err?: any) => this.error(message, err),
-      log: (message: string) => this.log(message)
+      log: (message: string, plugin?: Plugin) => this.log(message, plugin)
     };
 
     this.PLUGIN_CONTEXT = `${GLOBAL_AVAILABLE_COMMANDS}`;
 
     this.config.plugins.forEach(plugin => {
       plugin.initialize(this.logger); // TODO: maybe pass in entire agent
-      this.PLUGIN_CONTEXT += `\n${JSON.stringify(plugin)}`;
+      const commandsXml = Object.entries(plugin.commands)
+        .map(([name, cmd]) => {
+          const paramsStr = Object.entries(cmd.params)
+            .map(([paramName, defaultValue]) => `${paramName}=${defaultValue}`)
+            .join(',');
+          return `<TASK PLUGIN="${plugin.name}" COMMAND="${name}" PARAMS="${paramsStr}">${cmd.description}</TASK>`;
+        })
+        .join('\n');
+      this.PLUGIN_CONTEXT += `\n${commandsXml}`;
     });
 
     this.debug(this.PLUGIN_CONTEXT);
@@ -127,11 +135,10 @@ export class Agent {
     }
   }
 
-  private log(message: string) {
+  private log(message: string, plugin?: Plugin) {
     console.log(message);
     if (this.config.ws) {
-      // TODO: agent for non plugins, plugin name and command name for plugins
-      WSServer.log(message, 'agent');
+      WSServer.log(message, plugin?.name || 'agent');
     }
   }
 
@@ -203,10 +210,12 @@ export class Agent {
       // Parse params
       let parsedParams: Record<string, any> = {};
       try {
-        params.split(',').forEach(param => {
-          const [key, value] = param.split('=');
-          parsedParams[key.trim()] = value.trim();
-        });
+        if (params.trim()) {  // Only parse if params is non-empty
+          params.split(',').forEach(param => {
+            const [key, value] = param.split('=');
+            parsedParams[key.trim()] = value.trim();
+          });
+        }
       } catch (e) {
         this.warn(`Invalid params format for task: ${description}, skipping`);
         continue;
@@ -283,6 +292,7 @@ export class Agent {
 
     this.debug(`[${task.id}] AI response: ${response}`);
     
+    // TODO: might want to add summary to response
     const newTasks = this.parseNewTasks(response);
 
     this.debug(`[${task.id}] New tasks: ${newTasks.length}`);
@@ -324,7 +334,7 @@ export class Agent {
 
       // Small delay to prevent tight loops
       this.debug(`Waiting for 5 seconds`);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // await new Promise(resolve => setTimeout(resolve, 250));
     }
   }
 
@@ -340,7 +350,7 @@ export class Agent {
 // Create and run the agent
 const config: AgentConfig = {
   plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],
-  persona: PERSONAS.PLUGIN_DEMO_2,
+  persona: PERSONAS.SOLANA_TRADER,
   debug: true,
   ws: true
 };

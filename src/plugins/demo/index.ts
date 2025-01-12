@@ -2,7 +2,7 @@ import type { Plugin, Command, Logger } from '../../types';
 
 export class Demo implements Plugin {
   name = 'demo';
-  logger?: Logger;
+  logger!: Logger;
   commands: Record<string, Command> = {
     PRINT: {
       name: 'PRINT',
@@ -11,12 +11,15 @@ export class Demo implements Plugin {
         input: 'test'  // Default value
       },
       execute: async (params: Record<string, string>): Promise<void> => {
-        this.logger?.log(`${params.input}`);
+        this.logger.log(`${params.input}`);
       }
     }
   }
 
   async initialize(logger: Logger): Promise<void> {
-    this.logger = logger;
+    this.logger = {
+      ...logger,
+      log: (message: string) => logger.log(message, this)
+    };
   }
 } 

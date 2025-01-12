@@ -2,7 +2,7 @@ export interface Logger {
   debug(message: string): void;
   warn(message: string): void;
   error(message: string, err?: any): void;
-  log(message: string): void;
+  log(message: string, plugin?: Plugin): void;
 }
 
 export interface Command {
@@ -16,7 +16,7 @@ export interface Plugin {
   name: string;
   initialize(logger: Logger): Promise<void>;
   commands: Record<string, Command>;
-  logger?: Logger; // TODO: make required
+  logger: Logger;
 }
 
 export interface AgentPersona {

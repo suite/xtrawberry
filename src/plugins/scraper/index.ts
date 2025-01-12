@@ -2,7 +2,7 @@ import type { Plugin, Command, Logger } from '../../types';
 
 export class ScraperPlugin implements Plugin {
   name = 'scraper';
-  logger?: Logger;
+  logger!: Logger;
   commands: Record<string, Command> = {
     SEARCH: {
       name: 'SEARCH',
@@ -17,6 +17,9 @@ export class ScraperPlugin implements Plugin {
   }
 
   async initialize(logger: Logger): Promise<void> {
-    this.logger = logger;
+    this.logger = {
+      ...logger,
+      log: (message: string) => logger.log(message, this)
+    };
   }
 } 
