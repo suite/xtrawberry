@@ -1,5 +1,5 @@
 import { Demo } from '../plugins/demo';
-import type { AgentConfig, AgentPersona, Command } from '../types';
+import type { AgentConfig, AgentPersona, Command, Plugin } from '../types';
 import { AI } from './ai';
 
 const GLOBAL_AVAILABLE_COMMANDS = '<BEGIN Available commands>';
@@ -9,7 +9,21 @@ Example Plugin Usage:
 to execute a plugin command, wrap it in XML tags like: <TASK PLUGIN="name" COMMAND="command" PARAMS="params">task description</TASK>
 <TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
 
+REMEMBER:
+1. If you want the next task to execute a plugin command, wrap it in XML tags like: <TASK PLUGIN="name" COMMAND="command" PARAMS="params">task description</TASK>
+1.1 example: <TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
+
+2. If you want the next task to be a normal task, without executing a plugin command, wrap it in XML tags like: <TASK>task description</TASK>
+
+YOU CAN USE MULTIPLE PLUGINS IN THE SAME TASK. YOU CAN USE MULTIPLE COMMANDS IN THE SAME TASK.
+
+ANYTIME YOU ARE WRITING CONTENT FOR A PLUGIN COMMAND, YOU MUST INCLUDE THE PLUGIN NAME, COMMAND NAME, AND PARAMS IN THE XML TAG.
+
 Look to the ${GLOBAL_AVAILABLE_COMMANDS} section to see what commands are available for each plugin.
+
+NEVER ASK QUESTIONS FROM THE USER. NEVER ASK QUESTIONS FROM THE USER. NEVER ASK QUESTIONS FROM THE USER.
+
+ONLY USE THE CONTEXT GIVEN AND THE PLUGIN COMMANDS TO CREATE NEW TASKS.
 `;
 
 export const PERSONAS: Record<string, AgentPersona> = {
@@ -31,8 +45,8 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
   },
   PLUGIN_DEMO: {
     name: 'Plugin Demo',
-    initialContext: `You are a plugin demo. Your purpose is to demo the plugin system.`,
-    initialTaskDescription: "you are a plugin demo. demo the plugin system. use the demo plugin to print 'LOL' to the console. after that, print a joke. "
+    initialContext: `You are a plugin demo. Your purpose is to demo the plugin system. Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK.`,
+    initialTaskDescription: "you are a plugin demo. demo the plugin system. use the demo plugin to print 'LOL' to the console. after that, print a joke, then print 3 prime numbers.  Once done dont keep creating a task that prints 'DONE' and only 'DONE'. DO NOT REPEAT ANY ACTIONS IF ALEADY COMPLETED. IF A DONE TASK IS INCLUDED, MAKE SURE TO REPEAT IT IN THE NEXT TASK."
   }
 };
 
@@ -56,7 +70,8 @@ interface Task {
   description: string;
   status: 'pending' | 'in_progress' | 'completed';
   context?: string;
-  command?: Pick<Command, 'params' | 'execute'>;
+  command?: Pick<Command, 'params' | 'execute' | 'name'>;
+  plugin?: Plugin;
 }
 
 export class Agent {
@@ -129,6 +144,7 @@ export class Agent {
 
     // Parse plugin tasks
     while ((match = pluginRegex.exec(response)) !== null) {
+      console.log(`-------------------------------FOUND PLUGIN TASK: ${match}-------------------------------`);
       const [_, pluginName, command, params, description] = match;
       
       // Validate plugin exists
@@ -162,9 +178,11 @@ export class Agent {
         status: 'pending',
         context: response,
         command: {
+          name: command,
           params: parsedParams,
           execute: plugin.commands[command].execute
-        }
+        },
+        plugin
       };
 
       tasks.push(task);
@@ -195,13 +213,14 @@ export class Agent {
 
     // Execute command if present
     let commandExecutionStatus = '';
-    if (task.command) {
+    if (task.command && task.plugin) {
+      const commandXml = `<TASK PLUGIN="${task.plugin.name}" COMMAND="${task.command.name}" PARAMS="${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}">${task.description}</TASK>`;
       try {
         await task.command.execute(task.command.params);
-        commandExecutionStatus = `\n\nThe previous plugin command was executed successfully. You can continue with the next task.`;
+        commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
       } catch (error) {
-        commandExecutionStatus = `\n\nThe previous plugin command failed with error: ${error}`;
+        commandExecutionStatus = `\n\nPrevious task result: ${commandXml} failed with error: ${error}`;
         this.error(`[${task.id}] Error executing command:`, error);
       }
     }
@@ -217,6 +236,7 @@ export class Agent {
     }`;
 
     this.debug(`[${task.id}] Sending message to AI: ${message}`);
+    console.log(`[${task.id}] Sending message to AI: ${message}`);
 
     const response = await this.ai.sendMessage(conversationId, message);
 

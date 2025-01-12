@@ -1,4 +1,5 @@
 export interface Command {
+  name: string;
   description: string;
   params: Record<string, string>;
   execute: (args: Record<string, string>) => Promise<void>;
