@@ -22,22 +22,19 @@ export class WSServer {
             type: 'connection',
             message: 'Connected to xtrawberry agent'
           }));
-          WSServer.log('Client connected');
         },
         close(ws) {
           ws.unsubscribe(WSServer.CHANNEL);
-          WSServer.log('Client disconnected');
         },
-        message(ws, message) {
-          WSServer.log('Received: ' + message);
-        }
+        // required for ws server
+        message(ws, message) {}
       }
     });
 
     WSServer.log(`WebSocket server started on ${this.server.hostname}:${this.PORT}`);
   }
 
-  public static broadcast(message: any): void {
+  private static broadcast(message: any): void {
     if (!this.server) return;
 
     const payload = JSON.stringify({
