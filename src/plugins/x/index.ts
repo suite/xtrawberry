@@ -1,23 +1,33 @@
-import type { Logger, Plugin } from '../../types';
+import { Agent } from '../../agent';
+import type { Command, Plugin } from '../../types';
 
 export class X implements Plugin {
   name = 'x';
-  logger!: Logger;
-  commands = {
+  commands: Record<string, Command> = {
     VIEW_FEED: {
       name: 'VIEW_FEED',
       description: 'Views the feed',
       params: {},
-      execute: async (params: Record<string, string>): Promise<void> => {
-        this.logger.log(`Viewing feed`);
+      execute: async (params: Record<string, string>): Promise<string> => {
+        this.agent?.log(`Viewing feed. It looks like $DUST is gonna be big!`, this);
+        return "Viewing feed. It looks like $DUST is gonna be big!";
+      }
+    },
+    TWEET: {
+      name: 'TWEET',
+      description: 'Tweets a message',
+      params: {
+        "input": "tweet"
+      },
+      execute: async (params: Record<string, string>): Promise<string> => {
+        this.agent?.log(`Tweeting: ${params.input}`, this);
+        return `Tweeting: ${params.input}`;
       }
     }
-  }
+  };
+  agent?: Agent;
 
-  async initialize(logger: Logger): Promise<void> {
-    this.logger = {
-      ...logger,
-      log: (message: string) => logger.log(message, this)
-    };
+  setAgent(agent: Agent): void {
+    this.agent = agent;
   }
 } 

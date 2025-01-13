@@ -1,23 +1,18 @@
-export interface Logger {
-  debug(message: string): void;
-  warn(message: string): void;
-  error(message: string, err?: any): void;
-  log(message: string, plugin?: Plugin): void;
-}
+import { Agent } from "../agent";
 
 export interface Command {
   name: string;
   description: string;
   params: Record<string, string>;
-  execute: (args: Record<string, string>, taskId: string) => Promise<void>;
+  execute: (args: Record<string, string>, taskId: string) => Promise<string>;
   hasExecuted?: boolean;
 }
 
 export interface Plugin {
   name: string;
-  initialize(logger: Logger): Promise<void>;
   commands: Record<string, Command>;
-  logger: Logger;
+  agent?: Agent;
+  setAgent(agent: Agent): void;
 }
 
 export interface AgentPersona {

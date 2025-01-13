@@ -1,5 +1,5 @@
 import { Demo } from '../plugins/demo';
-import type { AgentConfig, AgentPersona, Command, Plugin, Logger } from '../types';
+import type { AgentConfig, AgentPersona, Command, Plugin } from '../types';
 import { AI } from './ai';
 import { WSServer } from '../ws';
 import { ScraperPlugin } from '../plugins/scraper';
@@ -70,6 +70,19 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
     name: 'Plugin Demo 2',
     context: `You are a plugin demo. Your purpose is to demo the plugin system. find what plugins are available and use them one by one. continue the loop forever.`,
     initialTaskDescription: "you are a plugin demo. demo the plugin system. find what plugins are available and use them one by one. continue the loop forever."
+  },
+  X_DEGEN: {
+    name: 'X Degen',
+    context: `PERSONALITY: You are a seasoned Solana trader with deep market knowledge. You maintain a calculated, reserved demeanor while being absolutely certain in your analysis. You prefer to keep a low profile but when you speak, your expertise is evident. Your statements are measured, direct, and carry the weight of experience.
+
+Your purpose is to find the best x projects to invest in. Use the x plugin and search scraper plugin to research and find the best x projects to invest in. Once you've done enough research about a project, tweet about it in your signature degen style - short, hype, with lots of conviction. Example tweet style:
+"$ticker looks pretty good"
+"<intro> <topic name>'s <topic feature>"
+
+NO EMOJIS.
+
+ONLY TWEET IF YOU FIND NEW INFORMATION. ONLY TWEET ABOUT RELEVANT INFO. NEVER TWEET JUST FOR THE SAKE OF TWEETING. YOU CAN ASK QUESTIONS, DERIVIVE THINGS FROM CONTEXT. SEARCH THINGS UP IF NEEDED.`,
+    initialTaskDescription: "gm frens, time to find some alpha. let's see what's pumping and find the next 100x gem 💎"
   }
 };
 
@@ -89,7 +102,6 @@ export class Agent {
   private ai: AI;
   private PLUGIN_CONTEXT: string;
   private currentPersona: AgentPersona;
-  private logger: Logger;
 
   constructor(config: AgentConfig) {
     this.config = { debug: false, ws: false, ...config };
@@ -97,17 +109,11 @@ export class Agent {
     this.currentPersona = config.persona || PERSONAS.SOLANA_TRADER;
     this.currentPersona.context = `${this.currentPersona.context}\n\n${GLOBAL_CONTEXT}`;
 
-    this.logger = {
-      debug: (message: string) => this.debug(message),
-      warn: (message: string) => this.warn(message),
-      error: (message: string, err?: any) => this.error(message, err),
-      log: (message: string, plugin?: Plugin) => this.log(message, plugin)
-    };
-
     this.PLUGIN_CONTEXT = `${GLOBAL_AVAILABLE_COMMANDS}`;
 
     this.config.plugins.forEach(plugin => {
-      plugin.initialize(this.logger); // TODO: maybe pass in entire agent
+      plugin.setAgent(this);
+
       const commandsXml = Object.entries(plugin.commands)
         .map(([name, cmd]) => {
           const paramsXml = Object.entries(cmd.params)
@@ -131,7 +137,7 @@ export class Agent {
     }
   }
 
-  private log(message: string, plugin?: Plugin, taskId: string = '-1') {
+  log(message: string, plugin?: Plugin, taskId: string = '-1') {
     console.log(message);
     if (this.config.ws) {
       WSServer.log(message, plugin?.name || `agent - ${this.currentPersona.name}`, taskId);
@@ -214,7 +220,7 @@ export class Agent {
         try {
           if (paramsMatch) {
             const paramsContent = paramsMatch[1];
-            const paramRegex = /<(\w+)>(.*?)<\/\1>/g;
+            const paramRegex = /<(\w+)>(.*?)<\/\1>/gs;
             let paramMatch;
             while ((paramMatch = paramRegex.exec(paramsContent)) !== null) {
               const [_, paramName, paramValue] = paramMatch;
@@ -272,12 +278,13 @@ export class Agent {
 
     // Execute command if present
     let commandExecutionStatus = '';
+    let commandResponse = '';
     if (task.command && task.plugin) {
       this.log(`[${task.id}] Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
       const commandXml = `<TASK> <PLUGIN>${task.plugin.name}</PLUGIN> <COMMAND>${task.command.name}</COMMAND> <PARAMS>${Object.entries(task.command.params).map(([k,v]) => `<${k}>${v}</${k}>`).join('')}</PARAMS> <DESCRIPTION>${task.description}</DESCRIPTION> </TASK>`;
       try {
         // TODO: get response from execute, add to context, make last 10 results available and made obvious to read
-        await task.command.execute(task.command.params, task.id);
+        commandResponse = await task.command.execute(task.command.params, task.id);
         task.command.hasExecuted = true;
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
@@ -296,7 +303,7 @@ export class Agent {
     const message = `${this.currentPersona.context}\n\n${this.PLUGIN_CONTEXT}\n\n${
       task.id === '1' 
         ? `Your first task: ${task.description}`
-        : `Current task: ${task.description}${task.context ? `\n\nContext from previous task: ${task.context}` : ''}${commandExecutionStatus}`
+        : `Current task: ${task.description}${task.context ? `\n\nContext from previous task: ${task.context}` : ''}${commandExecutionStatus}\n\n${commandResponse ? `Command response THIS MAY HELP WITH NEW CONTEXT, READ CAREFULLY.: ${commandResponse}` : ''}`
     }`;
 
     this.debug(`[${task.id}] Sending message to AI: ${message}`);
@@ -384,14 +391,12 @@ export class Agent {
   }
 }
 
-// Create and run the agent
 const config: AgentConfig = {
-  plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],
-  persona: PERSONAS.PLUGIN_DEMO,
+  plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],  
+  persona: PERSONAS.X_DEGEN,
   debug: true,
   ws: true
 };
-
 const agent = new Agent(config);
 
 // Handle graceful shutdown

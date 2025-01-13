@@ -1,23 +1,23 @@
-import type { Logger, Plugin } from '../../types';
+import { Agent } from '../../agent';
+import type { Command, Plugin } from '../../types';
 
 export class SolanaPlugin implements Plugin {
   name = 'solana';
-  logger!: Logger;
-  commands = {
+  commands: Record<string, Command> = {
     CREATE_WALLET: {
       name: 'CREATE_WALLET',
       description: 'Creates a new wallet',
       params: {},
-      execute: async (params: Record<string, string>, taskId: string): Promise<void> => {
-        this.logger.log(`[${taskId}] Creating wallet`);
+      execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
+        this.agent?.log(`[${taskId}] Creating wallet`, this);
+        return "";
       }
     }
+  };
+  agent?: Agent;
+
+  setAgent(agent: Agent): void {
+    this.agent = agent;
   }
 
-  async initialize(logger: Logger): Promise<void> {
-    this.logger = {
-      ...logger,
-      log: (message: string) => logger.log(message, this)
-    };
-  }
 } 

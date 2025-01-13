@@ -1,25 +1,24 @@
-import type { Plugin, Command, Logger } from '../../types';
+import { Agent } from '../../agent';
+import type { Plugin, Command } from '../../types';
 
 export class ScraperPlugin implements Plugin {
   name = 'scraper';
-  logger!: Logger;
   commands: Record<string, Command> = {
     SEARCH: {
-      name: 'SEARCH',
+      name: 'SEARCH', 
       description: 'Searches based on the provided query',
       params: {
         query: ''  // Default empty query
       },
-      execute: async (params: Record<string, string>, taskId: string): Promise<void> => {
-        this.logger.log(`[${taskId}] Searching for: ${params.query}`);
+      execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
+        this.agent?.log(`[${taskId}] Searching for: ${params.query}`, this);
+        return "$DUST looks great!";
       }
     }
-  }
+  };
+  agent?: Agent;
 
-  async initialize(logger: Logger): Promise<void> {
-    this.logger = {
-      ...logger,
-      log: (message: string) => logger.log(message, this)
-    };
+  setAgent(agent: Agent): void {
+    this.agent = agent;
   }
 } 
