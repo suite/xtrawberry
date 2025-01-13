@@ -35,21 +35,23 @@ export class WSServer {
     WSServer.log(`WebSocket server started on ${this.server.hostname}:${this.PORT}`);
   }
 
+  // TODO: type message
   private static broadcast(message: any): void {
     if (!this.server) return;
 
     const payload = JSON.stringify({
       type: message.type || 'broadcast',
       message: message.message || message,
+      taskId: message.taskId,
       timestamp: new Date().toISOString()
     });
 
     this.server.publish(this.CHANNEL, payload);
   }
 
-  public static log(message: string, type: string = 'log'): void {
-    console.log(`[${type}] ${message}`);
-    this.broadcast({ type, message });
+  public static log(message: string, type: string = 'log', taskId?: string): void {
+    console.log(`[${type}${taskId ? ` - Task ${taskId}` : ''}] ${message}`);
+    this.broadcast({ type, message, taskId });
   }
 
   public static warn(message: string): void {

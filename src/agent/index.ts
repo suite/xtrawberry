@@ -78,7 +78,7 @@ interface Task {
   description: string;
   status: 'pending' | 'in_progress' | 'completed';
   context?: string;
-  command?: Pick<Command, 'params' | 'execute' | 'name'>;
+  command?: Pick<Command, 'params' | 'execute' | 'name' | 'hasExecuted'>;
   plugin?: Plugin;
 }
 
@@ -131,10 +131,10 @@ export class Agent {
     }
   }
 
-  private log(message: string, plugin?: Plugin) {
+  private log(message: string, plugin?: Plugin, taskId: string = '-1') {
     console.log(message);
     if (this.config.ws) {
-      WSServer.log(message, plugin?.name || `agent - ${this.currentPersona.name}`);
+      WSServer.log(message, plugin?.name || `agent - ${this.currentPersona.name}`, taskId);
     }
   }
 
@@ -267,24 +267,25 @@ export class Agent {
   }
 
   private async executeTask(task: Task): Promise<void> {
-    this.log(`[${task.id}] Executing task: ${task.description}`);
+    this.log(`[${task.id}] Executing task: ${task.description}`, undefined, task.id);
     task.status = 'in_progress';
 
     // Execute command if present
     let commandExecutionStatus = '';
     if (task.command && task.plugin) {
-      this.log(`[${task.id}] Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`);
+      this.log(`[${task.id}] Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
       const commandXml = `<TASK> <PLUGIN>${task.plugin.name}</PLUGIN> <COMMAND>${task.command.name}</COMMAND> <PARAMS>${Object.entries(task.command.params).map(([k,v]) => `<${k}>${v}</${k}>`).join('')}</PARAMS> <DESCRIPTION>${task.description}</DESCRIPTION> </TASK>`;
       try {
         // TODO: get response from execute, add to context, make last 10 results available and made obvious to read
         await task.command.execute(task.command.params, task.id);
+        task.command.hasExecuted = true;
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
-        this.log(`[${task.id}] Successfully executed command ${task.plugin.name} ${task.command.name}`);
+        this.log(`[${task.id}] Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
       } catch (error) {
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} failed with error: ${error}`;
         this.error(`[${task.id}] Error executing command:`, error);
-        this.log(`[${task.id}] Error executing command ${task.plugin.name} ${task.command.name}`);
+        this.log(`[${task.id}] Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
       }
     }
 
@@ -315,11 +316,12 @@ export class Agent {
         const isDuplicate = this.tasks.some(existingTask => 
           existingTask.plugin?.name === newTask.plugin?.name &&
           existingTask.command?.name === newTask.command?.name &&
-          existingTask.description === newTask.description
+          existingTask.description === newTask.description &&
+          existingTask.command?.hasExecuted !== true
         );
 
         if (isDuplicate) {
-          this.log(`[${task.id}] Duplicate task found, skipping: ${newTask.description}`);
+          this.log(`[${task.id}] Duplicate task found, skipping: ${newTask.description}`, undefined, task.id);
           return;
         }
       }
@@ -328,13 +330,13 @@ export class Agent {
     });
 
     if(tasksToAdd.length > 0) {
-      this.log(`[${task.id}] Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`);
+      this.log(`[${task.id}] Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`, undefined, task.id);
       tasksToAdd.forEach(newTask => this.addTask(newTask));
     }
 
     task.status = 'completed';
     this.debug(`Completed task ${task.id}`); 
-    this.log(`[${task.id}] Completed task`);
+    this.log(`[${task.id}] Completed task`, undefined, task.id);
   }
 
   async start() {
