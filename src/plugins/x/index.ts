@@ -1,5 +1,6 @@
 import { Agent } from '../../agent';
 import type { Command, Plugin } from '../../types';
+import { sendToDiscordWebhook } from '../../utils/discord';
 
 export class X implements Plugin {
   name = 'x';
@@ -9,8 +10,8 @@ export class X implements Plugin {
       description: 'Views the feed',
       params: {},
       execute: async (params: Record<string, string>): Promise<string> => {
-        this.agent?.log(`Viewing feed. It looks like $DUST is gonna be big!`, this);
-        return "Viewing feed. It looks like $DUST is gonna be big!";
+        this.agent?.log(`Viewing feed.`, this);
+        return "No content. Use scraper plugin to get content.";
       }
     },
     TWEET: {
@@ -21,6 +22,10 @@ export class X implements Plugin {
       },
       execute: async (params: Record<string, string>): Promise<string> => {
         this.agent?.log(`Tweeting: ${params.input}`, this);
+        
+        // Send to Discord webhook for debugging
+        await sendToDiscordWebhook(params.input, (msg) => this.agent?.error(msg, this));
+
         return `Tweeting: ${params.input}`;
       }
     }
