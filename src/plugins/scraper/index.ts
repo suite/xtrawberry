@@ -10,8 +10,8 @@ export class ScraperPlugin implements Plugin {
       params: {
         query: ''  // Default empty query
       },
-      execute: async (params: Record<string, string>): Promise<void> => {
-        this.logger?.log(`Searching for: ${params.query}`);
+      execute: async (params: Record<string, string>, taskId: string): Promise<void> => {
+        this.logger.log(`[${taskId}] Searching for: ${params.query}`);
       }
     }
   }

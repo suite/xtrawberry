@@ -8,8 +8,8 @@ export class SolanaPlugin implements Plugin {
       name: 'CREATE_WALLET',
       description: 'Creates a new wallet',
       params: {},
-      execute: async (params: Record<string, string>): Promise<void> => {
-        this.logger.log(`Creating wallet`);
+      execute: async (params: Record<string, string>, taskId: string): Promise<void> => {
+        this.logger.log(`[${taskId}] Creating wallet`);
       }
     }
   }

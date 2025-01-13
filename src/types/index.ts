@@ -9,7 +9,7 @@ export interface Command {
   name: string;
   description: string;
   params: Record<string, string>;
-  execute: (args: Record<string, string>) => Promise<void>;
+  execute: (args: Record<string, string>, taskId: string) => Promise<void>;
 }
 
 export interface Plugin {

@@ -118,8 +118,6 @@ export class Agent {
         .join('\n');
       this.PLUGIN_CONTEXT += `\n${commandsXml}`;
     });
-
-    this.debug(this.PLUGIN_CONTEXT);
     
     this.tasks = [{
       id: '1',
@@ -269,7 +267,6 @@ export class Agent {
   }
 
   private async executeTask(task: Task): Promise<void> {
-    this.debug(`[${task.id}] Executing task: ${task.description}`);
     this.log(`[${task.id}] Executing task: ${task.description}`);
     task.status = 'in_progress';
 
@@ -280,7 +277,7 @@ export class Agent {
       const commandXml = `<TASK> <PLUGIN>${task.plugin.name}</PLUGIN> <COMMAND>${task.command.name}</COMMAND> <PARAMS>${Object.entries(task.command.params).map(([k,v]) => `<${k}>${v}</${k}>`).join('')}</PARAMS> <DESCRIPTION>${task.description}</DESCRIPTION> </TASK>`;
       try {
         // TODO: get response from execute, add to context, make last 10 results available and made obvious to read
-        await task.command.execute(task.command.params);
+        await task.command.execute(task.command.params, task.id);
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
         this.log(`[${task.id}] Successfully executed command ${task.plugin.name} ${task.command.name}`);

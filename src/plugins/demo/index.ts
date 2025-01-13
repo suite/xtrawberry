@@ -10,8 +10,8 @@ export class Demo implements Plugin {
       params: {
         input: 'test'  // Default value
       },
-      execute: async (params: Record<string, string>): Promise<void> => {
-        this.logger.log(`${params.input}`);
+      execute: async (params: Record<string, string>, taskId: string): Promise<void> => {
+        this.logger.log(`[${taskId}] ${params.input}`);
       }
     }
   }
