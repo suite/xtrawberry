@@ -3,14 +3,21 @@
 import { useEffect, useState } from 'react';
 
 type Message = {
-  channel: string;
   type: string;
   message: string;
+  taskId?: string;
   timestamp?: string;
 };
 
+type TaskGroup = {
+  taskId: string;
+  messages: Message[];
+  timestamp: string;
+  isSystemMessage: boolean;
+};
+
 const CHANNEL = 'xtrawberry';
-const RETRY_INTERVAL = 5000; // TODO: RETRY MIGHT BE BUGGING
+const RETRY_INTERVAL = 5000;
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,12 +36,11 @@ export default function Home() {
 
       ws.onclose = () => {
         setStatus('disconnected');
-        // Schedule reconnection after RETRY_INTERVAL
         retryTimeout = setTimeout(connect, RETRY_INTERVAL);
       };
 
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
+        const data: Message = JSON.parse(event.data);
         console.log(data);
         setMessages(prev => [...prev, data]);
       };
@@ -50,29 +56,89 @@ export default function Home() {
     };
   }, []);
 
+  // Convert messages to cards while preserving order
+  const cards = messages.map((msg, index) => {
+    const taskId = msg.taskId || '-1';
+    const isSystemMessage = taskId === '-1';
+
+    return {
+      taskId,
+      messages: [msg],
+      timestamp: msg.timestamp || new Date().toISOString(),
+      isSystemMessage,
+      originalIndex: index // Keep track of original order
+    };
+  });
+
+  // Group task messages while preserving system message positions
+  const groupedCards = cards.reduce((acc, card) => {
+    if (card.isSystemMessage) {
+      // Keep system messages as individual cards
+      acc.push(card);
+    } else {
+      // Find the last card for this task ID
+      const lastTaskCard = [...acc].reverse().find(c => c.taskId === card.taskId && !c.isSystemMessage);
+      
+      if (lastTaskCard) {
+        // Add message to existing task card
+        lastTaskCard.messages.push(card.messages[0]);
+        lastTaskCard.timestamp = card.timestamp;
+      } else {
+        // Create new task card
+        acc.push(card);
+      }
+    }
+    return acc;
+  }, [] as (TaskGroup & { originalIndex: number })[]);
+
+  // Sort to maintain original message order
+  const sortedCards = groupedCards.sort((a, b) => a.originalIndex - b.originalIndex);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-      <h2>xtrawberry</h2>
-      <div className="text-sm">
+    <div className="min-h-screen flex flex-col items-center p-8 bg-gray-900 text-gray-100">
+      <h2 className="text-2xl font-bold mb-4">xtrawberry</h2>
+      <div className="text-sm mb-4">
         Status: <span className={`font-bold ${
-          status === 'connected' ? 'text-green-500' : 
-          status === 'disconnected' ? 'text-red-500' : 
-          'text-yellow-500'
+          status === 'connected' ? 'text-green-400' : 
+          status === 'disconnected' ? 'text-red-400' : 
+          'text-yellow-400'
         }`}>{status}</span>
       </div>
-      <div className="max-w-md w-full mt-4">
-        <h3 className="text-lg mb-2">Messages:</h3>
-        <div className="border rounded p-4 h-96 overflow-y-auto">
-          {messages.map((msg, i) => (
-            <div key={i} className="mb-3 p-2 bg-gray-50 rounded">
-              <div className="text-sm font-bold text-gray-700">{msg.type}</div>
-              <div className="text-gray-800">{msg.message}</div>
-              {msg.timestamp && (
-                <div className="text-xs text-gray-500 mt-1">{msg.timestamp}</div>
+      
+      <div className="w-full max-w-4xl space-y-4">
+        {sortedCards.map((card, index) => (
+          <div 
+            key={`${card.taskId}-${card.originalIndex}`}
+            className={`rounded-lg p-4 shadow-lg border border-gray-700 ${
+              card.isSystemMessage ? 'bg-gray-800/50' : 'bg-gray-800'
+            }`}
+          >
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="text-lg font-semibold text-gray-200">
+                {card.isSystemMessage ? 'System Message' : `Task ${card.taskId}`}
+              </h3>
+              {card.timestamp && (
+                <span className="text-xs text-gray-400">
+                  {new Date(card.timestamp).toLocaleTimeString()}
+                </span>
               )}
             </div>
-          ))}
-        </div>
+            <div className="space-y-1.5">
+              {card.messages.map((msg, i) => (
+                <div key={i} className="text-sm flex items-start">
+                  <span className={`font-medium shrink-0 ${
+                    msg.type === 'error' ? 'text-red-400' :
+                    msg.type === 'warning' ? 'text-yellow-400' :
+                    'text-gray-300'
+                  }`}>
+                    [{msg.type}]
+                  </span>
+                  <span className="text-gray-100 ml-2 break-words flex-1">{msg.message}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
