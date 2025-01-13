@@ -31,6 +31,7 @@ export class WSServer {
       }
     });
 
+    // TODO: clean up logs throughout project, WS might not need to console log
     WSServer.log(`WebSocket server started on ${this.server.hostname}:${this.PORT}`);
   }
 

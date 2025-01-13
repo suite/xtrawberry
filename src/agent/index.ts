@@ -305,6 +305,7 @@ export class Agent {
     this.debug(`[${task.id}] AI response: ${response}`);
     
     // TODO: might want to add summary to response
+    // Make it clear what tasks have been completed/added, whats left, whats in progress
     const newTasks = this.parseNewTasks(response);
 
     const tasksToAdd: Task[] = [];
