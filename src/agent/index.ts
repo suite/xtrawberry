@@ -270,21 +270,24 @@ export class Agent {
 
   private async executeTask(task: Task): Promise<void> {
     this.debug(`[${task.id}] Executing task: ${task.description}`);
-    this.log(`${task.description}`);
+    this.log(`[${task.id}] Executing task: ${task.description}`);
     task.status = 'in_progress';
 
     // Execute command if present
     let commandExecutionStatus = '';
     if (task.command && task.plugin) {
+      this.log(`[${task.id}] Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`);
       const commandXml = `<TASK PLUGIN="${task.plugin.name}" COMMAND="${task.command.name}" PARAMS="${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}">${task.description}</TASK>`;
       try {
         // TODO: get response from execute, add to context, make last 10 results available and made obvious to read
         await task.command.execute(task.command.params);
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} was executed successfully. If you have another command to execute, proceed with that as your next task. If you have no more commands that need to be executed, feel free to continue the conversation naturally without any command tasks and DO NOT create a new task.`;
         this.debug(`[${task.id}] Successfully executed command`);
+        this.log(`[${task.id}] Successfully executed command ${task.plugin.name} ${task.command.name}`);
       } catch (error) {
         commandExecutionStatus = `\n\nPrevious task result: ${commandXml} failed with error: ${error}`;
         this.error(`[${task.id}] Error executing command:`, error);
+        this.log(`[${task.id}] Error executing command ${task.plugin.name} ${task.command.name}`);
       }
     }
 
@@ -307,12 +310,33 @@ export class Agent {
     // TODO: might want to add summary to response
     const newTasks = this.parseNewTasks(response);
 
-    this.debug(`[${task.id}] New tasks: ${newTasks.length}`);
+    const tasksToAdd: Task[] = [];
+    newTasks.forEach(newTask => {
+      // For plugin tasks, check for duplicates
+      if (newTask.plugin && newTask.command) {
+        const isDuplicate = this.tasks.some(existingTask => 
+          existingTask.plugin?.name === newTask.plugin?.name &&
+          existingTask.command?.name === newTask.command?.name &&
+          existingTask.description === newTask.description
+        );
 
-    newTasks.forEach(task => this.addTask(task));
+        if (isDuplicate) {
+          this.log(`[${task.id}] Duplicate task found, skipping: ${newTask.description}`);
+          return;
+        }
+      }
+      
+      tasksToAdd.push(newTask);
+    });
+
+    if(tasksToAdd.length > 0) {
+      this.log(`[${task.id}] Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`);
+      tasksToAdd.forEach(newTask => this.addTask(newTask));
+    }
 
     task.status = 'completed';
     this.debug(`Completed task ${task.id}`); 
+    this.log(`[${task.id}] Completed task`);
   }
 
   async start() {
@@ -347,7 +371,7 @@ export class Agent {
 
       // Small delay to prevent tight loops
       this.debug(`Waiting for 5 seconds`);
-      // await new Promise(resolve => setTimeout(resolve, 250));
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 
