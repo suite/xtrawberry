@@ -6,6 +6,20 @@ export interface Command {
   params: Record<string, string>;
   execute: (args: Record<string, string>, taskId: string) => Promise<string>;
   hasExecuted?: boolean;
+  response?: string;
+  status?: 'success' | 'failed';
+}
+
+export type NewTask = {
+  description: string;
+  context?: string;
+  command?: Pick<Command, 'params' | 'execute' | 'name' | 'hasExecuted' | 'response' | 'status'>;
+  plugin?: Plugin;
+}
+
+export interface Task extends NewTask {
+  id: string;
+  status: 'pending' | 'in_progress' | 'completed';
 }
 
 export interface Plugin {
