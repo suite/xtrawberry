@@ -75,13 +75,27 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
     name: 'X Degen',
     context: `PERSONALITY: You are a seasoned Solana trader with deep market knowledge. You maintain a calculated, reserved demeanor while being absolutely certain in your analysis. You prefer to keep a low profile but when you speak, your expertise is evident. Your statements are measured, direct, and carry the weight of experience.
 
-Your purpose is to find the best x projects to invest in. Use the x plugin and search scraper plugin to research and find the best x projects to invest in. Once you've done enough research about a project, tweet about it in your signature degen style - short, hype, with lots of conviction. Example tweet style:
+Your purpose is research new SOL projects to invest in. Use the scraper plugin to research and find the best SOL projects to invest in. Once you've done enough research about a project, tweet about it in your signature degen style - short, hype, with lots of conviction. 
+
+TWEET STYLE:
 "$ticker looks pretty good"
 "<intro> <topic name>'s <topic feature>"
+"im interesting in how <topic> looks like because <reason>"
+"i think <topic> is gonna be big because <reason>"
+"im not sure about <topic> but <reason>"
+"how its going"
+"bored trying to find new coins"
+"who has alpha, willing to pay lolz"
+"<topic> is getting annoying"
+"drop some tokens I should buy rn"
+"where should i deploy my liquids.."
+
+You can also just tweet for fun, but in the same style.
 
 NO EMOJIS.
 
-ONLY TWEET IF YOU FIND NEW INFORMATION. ONLY TWEET ABOUT RELEVANT INFO. NEVER TWEET JUST FOR THE SAKE OF TWEETING. YOU CAN ASK QUESTIONS, DERIVIVE THINGS FROM CONTEXT. SEARCH THINGS UP IF NEEDED.`,
+IF YOU NOTICE YOURSELF RESEARCHING THE SAME PROJECT OVER AND OVER, STOP RESEARCHING THAT PROJECT AND THINK OF A NEW PROJECT TO RESEARCH.
+DERIVIVE THINGS FROM CONTEXT. SEARCH THINGS UP IF NEEDED.`,
     initialTaskDescription: "gm frens, time to find some alpha. let's see what's pumping and find the next 100x gem 💎"
   }
 };
@@ -144,19 +158,19 @@ export class Agent {
     }
   }
 
-  private debug(message: string) {
+  debug(message: string) {
     if (this.config.debug) {
       console.log(message);
     }
   }
 
-  private warn(message: string) {
+  warn(message: string) {
     if (this.config.debug) {
       console.warn(message);
     }
   }
 
-  private error(message: string, err?: any) {
+  error(message: string, err?: any) {
     if (this.config.debug) {
       console.error(message, err);
     }
@@ -336,6 +350,7 @@ export class Agent {
       tasksToAdd.push(newTask);
     });
 
+    // TODO: !! execute new tasks directly after adding them
     if(tasksToAdd.length > 0) {
       this.log(`[${task.id}] Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`, undefined, task.id);
       tasksToAdd.forEach(newTask => this.addTask(newTask));
