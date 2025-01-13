@@ -32,7 +32,14 @@ export class ScraperPlugin implements Plugin {
             includeDomains: []            
           });
 
-          this.agent?.log(`[${taskId}] Tavily response from ${params.query}: ${JSON.stringify(response, null, 2)}`, this);
+          /*
+          need better sources:
+          - https://www.bitget.com/news
+          - https://cointelegraph.com/
+          - https://www.coindesk.com/
+          */
+
+          // this.agent?.log(`[${taskId}] Tavily response from ${params.query}: ${JSON.stringify(response, null, 2)}`, this);
           
           return JSON.stringify(response, null, 2);
         } catch (error) {
