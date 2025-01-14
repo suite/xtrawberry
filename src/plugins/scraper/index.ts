@@ -25,11 +25,11 @@ export class ScraperPlugin extends BasePlugin {
           const response = await client.search(params.query, {
             includeAnswer: true,
             maxResults: 5,
-            topic: "news",
+            // topic: "general",
             searchDepth: "advanced",
             includeImages: false,
-            days: 3,
-            includeDomains: []            
+            // days: 3,
+            // includeDomains: []            
           });
 
           /*
