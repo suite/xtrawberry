@@ -50,17 +50,14 @@ export class WSServer {
   }
 
   public static log(message: string, type: string = 'log', taskId?: string): void {
-    console.log(`[${type}${taskId ? ` - Task ${taskId}` : ''}] ${message}`);
     this.broadcast({ type, message, taskId });
   }
 
   public static warn(message: string): void {
-    console.warn(message);
     this.broadcast({ type: 'warning', message });
   }
 
   public static error(message: string, err?: any): void {
-    console.error(message, err);
     this.broadcast({ type: 'error', message: err ? `${message}: ${err}` : message });
   }
 

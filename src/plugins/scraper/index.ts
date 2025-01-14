@@ -1,8 +1,8 @@
-import { Agent } from '../../agent';
-import type { Plugin, Command } from '../../types';
+import type { Command } from '../../types';
+import { BasePlugin } from '../../types/base-plugin';
 import { tavily } from '@tavily/core';
 
-export class ScraperPlugin implements Plugin {
+export class ScraperPlugin extends BasePlugin {
   name = 'scraper';
   commands: Record<string, Command> = {
     SEARCH: {
@@ -12,11 +12,11 @@ export class ScraperPlugin implements Plugin {
         query: ''  // Default empty query
       },
       execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
-        this.agent?.log(`[${taskId}] Searching for: ${params.query}`, this);
+        this.log(`Searching for: ${params.query}`, taskId);
         
         const apiKey = process.env.TAVILY_API_KEY;
         if (!apiKey) {
-          this.agent?.warn('No TAVILY_API_KEY found in environment variables');
+          this.warn('No TAVILY_API_KEY found in environment variables', taskId);
           return '';
         }
 
@@ -38,20 +38,13 @@ export class ScraperPlugin implements Plugin {
           - https://cointelegraph.com/
           - https://www.coindesk.com/
           */
-
-          // this.agent?.log(`[${taskId}] Tavily response from ${params.query}: ${JSON.stringify(response, null, 2)}`, this);
           
           return JSON.stringify(response, null, 2);
         } catch (error) {
-          this.agent?.error(`Error during Tavily search: ${error}`);
+          this.error(`Error during Tavily search`, error, taskId);
           return '';
         }
       }
     }
   };
-  agent?: Agent;
-
-  setAgent(agent: Agent): void {
-    this.agent = agent;
-  }
 } 

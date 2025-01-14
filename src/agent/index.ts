@@ -1,10 +1,7 @@
-import { Demo } from '../plugins/demo';
-import type { AgentConfig, AgentPersona, Command, NewTask, Plugin, Task } from '../types';
+import type { AgentConfig, AgentPersona, NewTask, Plugin, Task } from '../types';
 import { AI } from './ai';
 import { WSServer } from '../ws';
-import { ScraperPlugin } from '../plugins/scraper';
-import { SolanaPlugin } from '../plugins/solana';
-import { X } from '../plugins/x';
+import { Demo, ScraperPlugin, SolanaPlugin, X } from '../plugins';
 
 const GLOBAL_AVAILABLE_COMMANDS = '<BEGIN Available commands>';
 
@@ -28,20 +25,6 @@ NEVER ASK QUESTIONS FROM THE USER.
 TRY NOT TO CREATE TOO MANY TASKS AT ONCE. FOCUS ON ONE TASK AT A TIME. WAIT FOR RESULTS FROM THE PREVIOUS TASK TO BECOME AVAILABLE BEFORE CREATING A NEW TASK.
 `;
 
-/*
-<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
-=
-<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
-
-<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL,example=DERP">Print LOL to the console</TASK>
-=
-<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input><example>DERP</example></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
-
-
-<TASK>task description</TASK>
-=
-<TASK> <DESCRIPTION>task description</DESCRIPTION> </TASK>
-*/
 export const PERSONAS: Record<string, AgentPersona> = {
   SOLANA_TRADER: {
     name: 'Solana Trader',
@@ -119,7 +102,7 @@ export class Agent {
     this.PLUGIN_CONTEXT = `${GLOBAL_AVAILABLE_COMMANDS}`;
 
     this.config.plugins.forEach(plugin => {
-      plugin.setAgent(this);
+      plugin.initialize(this);
 
       const commandsXml = Object.entries(plugin.commands)
         .map(([name, cmd]) => {
@@ -143,29 +126,46 @@ export class Agent {
     }
   }
 
+  // TODO: move to log util
+  private logMessage(level: 'log' | 'debug' | 'warn' | 'error', message: string, err?: any, plugin?: Plugin, taskId: string = '-1') {
+    if (level !== 'log' && !this.config.debug) return;
+
+    const pluginName = plugin?.name || `agent - ${this.currentPersona.name}`;
+    const logPrefix = `[${pluginName}] [${taskId}]`;
+    
+    switch (level) {
+      case 'log':
+        console.log(`${logPrefix} ${message}`);
+        if (this.config.ws) {
+          WSServer.log(message, pluginName, taskId);
+        }
+        break;
+      case 'debug':
+        console.log(`${logPrefix} ${message}`);
+        break;
+      case 'warn':
+        console.warn(`${logPrefix} ${message}`);
+        break;
+      case 'error':
+        console.error(`${logPrefix} ${message}`, err);
+        break;
+    }
+  }
+
   log(message: string, plugin?: Plugin, taskId: string = '-1') {
-    console.log(message);
-    if (this.config.ws) {
-      WSServer.log(message, plugin?.name || `agent - ${this.currentPersona.name}`, taskId);
-    }
+    this.logMessage('log', message, undefined, plugin, taskId);
   }
 
-  debug(message: string) {
-    if (this.config.debug) {
-      console.log(message);
-    }
+  debug(message: string, plugin?: Plugin, taskId: string = '-1') {
+    this.logMessage('debug', message, undefined, plugin, taskId);
   }
 
-  warn(message: string) {
-    if (this.config.debug) {
-      console.warn(message);
-    }
+  warn(message: string, plugin?: Plugin, taskId: string = '-1') {
+    this.logMessage('warn', message, undefined, plugin, taskId);
   }
 
-  error(message: string, err?: any) {
-    if (this.config.debug) {
-      console.error(message, err);
-    }
+  error(message: string, err: any, plugin?: Plugin, taskId: string = '-1') {
+    this.logMessage('error', message, err, plugin, taskId);
   }
 
   setPersona(personaKey: keyof typeof PERSONAS) {
@@ -301,57 +301,44 @@ export class Agent {
     }).join('\n\n');
   }
 
-  private async executeTask(task: Task): Promise<void> {
-    this.log(`[${task.id}] Executing task: ${task.description}`, undefined, task.id);
-    task.status = 'in_progress';
+  private async executePluginCommand(task: Task): Promise<void> {
+    if (!task.command || !task.plugin) return;
 
-    // Execute command if present
-    if (task.command && task.plugin) {
-      this.log(`[${task.id}] Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
-      try {
-        task.command.response = await task.command.execute(task.command.params, task.id);
-        task.command.hasExecuted = true;
-        task.command.status = 'success';
-        this.log(`[${task.id}] Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
-      } catch (error) {
-        task.command.status = 'failed';
-        task.command.response = `Error: ${error}`;
-        this.log(`[${task.id}] Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
-      }
-    }
-
-    const conversationId = `task-${task.id}`;
+    this.log(`Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
     
-    this.ai.createConversation(conversationId, task.id);
+    try {
+      task.command.response = await task.command.execute(task.command.params, task.id);
+      task.command.hasExecuted = true;
+      task.command.status = 'success';
+      this.log(`Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
+    } catch (error) {
+      task.command.status = 'failed';
+      task.command.response = `Error: ${error}`;
+      this.log(`Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
+    }
+  }
 
-    // Get pending tasks info
+  private getTaskContext(task: Task): string {
     const pendingTasks = this.tasks.filter(t => t.status === 'pending' && t.id !== task.id);
     const pendingTasksInfo = pendingTasks.length > 0 
       ? `${pendingTasks.length >= this.TASK_AMOUNT ? 'TOO MANY PENDING TASKS. LET THESE RUN FIRST! DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.\n\n' : ''}${pendingTasks.map(t => `- Task ${t.id}: ${this.formatTaskAsXml(t)}`).join('\n')}`
       : 'NO PENDING TASKS';
 
-    // Get command history
-    const commandHistory = pendingTasks.length >= this.TASK_AMOUNT ? 'TOO MANY PENDING TASKS. HIDING COMMAND HISTORY. DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.' : this.getCommandHistory();
+    const commandHistory = pendingTasks.length >= this.TASK_AMOUNT 
+      ? 'TOO MANY PENDING TASKS. HIDING COMMAND HISTORY. DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.' 
+      : this.getCommandHistory();
 
-    const message = `${this.currentPersona.context}\n\n${this.PLUGIN_CONTEXT}\n\n${
+    return `${this.currentPersona.context}\n\n${this.PLUGIN_CONTEXT}\n\n${
       task.id === '1' 
         ? `Your first task: ${task.description}`
         : `Current task: ${task.description}${task.context ? `\n\nContext from previous task: ${task.context}` : ''}`
     }\n\nCurrently pending tasks:\n${pendingTasksInfo}\n\nRecent command history:\n${commandHistory}\n\nPlease consider these pending tasks and command history when creating new tasks to avoid duplication or repeating patterns.`;
+  }
 
-    this.debug(`[${task.id}] Sending message to AI: ${message}`);
-
-    const response = await this.ai.sendMessage(conversationId, message);
-
-    this.debug(`[${task.id}] AI response: ${response}`);
-    
-    // TODO: might want to add summary to response
-    const newTasks = this.parseNewTasks(response);
-
+  private async processNewTasks(newTasks: NewTask[], taskId: string): Promise<void> {
     const tasksToAdd: NewTask[] = [];
 
-    // For plugin tasks, check for exact duplicates
-    newTasks.forEach(newTask => {
+    for (const newTask of newTasks) {
       if (newTask.plugin && newTask.command) {
         const isDuplicate = this.tasks.some(existingTask => 
           existingTask.plugin?.name === newTask.plugin?.name &&
@@ -361,22 +348,57 @@ export class Agent {
         );
 
         if (isDuplicate) {
-          this.log(`[${task.id}] Duplicate task found, skipping: ${newTask.description}`, undefined, task.id);
-          return;
+          this.log(`Duplicate task found, skipping: ${newTask.description}`, undefined, taskId);
+          continue;
         }
       }
       
       tasksToAdd.push(newTask);
-    });
+    }
 
     if(tasksToAdd.length > 0) {
-      this.log(`[${task.id}] Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`, undefined, task.id);
+      this.log(`Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`, undefined, taskId);
       tasksToAdd.forEach(newTask => this.addTask(newTask));
     }
+  }
+
+  private async executeTask(task: Task): Promise<void> {
+    this.log(`Executing task: ${task.description}`, undefined, task.id);
+    task.status = 'in_progress';
+
+    await this.executePluginCommand(task);
+
+    const conversationId = `task-${task.id}`;
+    this.ai.createConversation(conversationId, task.id);
+
+    const message = this.getTaskContext(task);
+    this.debug(`Sending message to AI: ${message}`);
+
+    const response = await this.ai.sendMessage(conversationId, message);
+    this.debug(`AI response: ${response}`);
+    
+    const newTasks = this.parseNewTasks(response);
+    await this.processNewTasks(newTasks, task.id);
 
     task.status = 'completed';
     this.debug(`Completed task ${task.id}`); 
-    this.log(`[${task.id}] Completed task`, undefined, task.id);
+    this.log(`Completed task`, undefined, task.id);
+  }
+
+  private createHistoryAnalysisTask(): void {
+    const lastCompletedTasks = this.tasks
+      .filter(t => t.status === 'completed')
+      .slice(-3);
+    
+    const tasksContext = lastCompletedTasks
+      .map(t => `Task ${t.id}: ${t.description}\nContext: ${t.context || 'No context'}`)
+      .join('\n\n');
+
+    const historyAnalysisTask: NewTask = {
+      description: "Analyze previous tasks and determine next steps",
+      context: `Review the last ${lastCompletedTasks.length} completed tasks and their outcomes to determine the next strategic steps.\n\nPrevious tasks summary:\n${tasksContext}`
+    };
+    this.addTask(historyAnalysisTask);
   }
 
   async start() {
@@ -389,25 +411,10 @@ export class Agent {
       if (pendingTask) {
         await this.executeTask(pendingTask);
       } else {
-        // No pending tasks, analyze history to determine next steps
         this.log(`No pending tasks, analyzing history`);
-      
-        const lastCompletedTasks = this.tasks
-          .filter(t => t.status === 'completed')
-          .slice(-3);
-        
-        const tasksContext = lastCompletedTasks
-          .map(t => `Task ${t.id}: ${t.description}\nContext: ${t.context || 'No context'}`)
-          .join('\n\n');
-
-        const historyAnalysisTask: NewTask = {
-          description: "Analyze previous tasks and determine next steps",
-          context: `Review the last ${lastCompletedTasks.length} completed tasks and their outcomes to determine the next strategic steps.\n\nPrevious tasks summary:\n${tasksContext}`
-        };
-        this.addTask(historyAnalysisTask);
+        this.createHistoryAnalysisTask();
       }
 
-      // Small delay to prevent tight loops
       this.debug(`Waiting for 5 seconds`);
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
@@ -443,3 +450,9 @@ agent.start().catch(console.error);
 // TODO:
 // clean up
 // send message to ui of what AI is thinking
+// implement twitter plugin
+// - view feed
+// - search
+// - tweet/reply
+// - follow
+// - tweet

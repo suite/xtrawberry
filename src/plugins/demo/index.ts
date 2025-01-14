@@ -1,7 +1,7 @@
-import { Agent } from '../../agent';
-import type { Plugin, Command } from '../../types';
+import type { Command } from '../../types';
+import { BasePlugin } from '../../types/base-plugin';
 
-export class Demo implements Plugin {
+export class Demo extends BasePlugin {
   name = 'demo';
   commands: Record<string, Command> = {
     PRINT: {
@@ -11,14 +11,9 @@ export class Demo implements Plugin {
         input: 'test'  // Default value
       },
       execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
-        this.agent?.log(`[${taskId}] ${params.input}`, this);
+        this.log(params.input, taskId);
         return "test";
       }
     }
   };
-  agent?: Agent;
-
-  setAgent(agent: Agent): void {
-    this.agent = agent;
-  }
 } 
