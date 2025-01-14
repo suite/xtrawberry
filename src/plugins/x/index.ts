@@ -1,19 +1,16 @@
-import { Agent } from '../../agent';
-import type { Command, Plugin } from '../../types';
+import type { Command } from '../../types';
+import { BasePlugin } from '../../types/base-plugin';
 import { sendToDiscordWebhook } from '../../utils/discord';
 
-export class X implements Plugin {
-  initialize(agent: Agent): void {
-    throw new Error('Method not implemented.');
-  }
+export class X extends BasePlugin {
   name = 'x';
   commands: Record<string, Command> = {
     VIEW_FEED: {
       name: 'VIEW_FEED',
       description: 'Views the feed',
       params: {},
-      execute: async (params: Record<string, string>): Promise<string> => {
-        this.agent?.log(`Viewing feed.`, this);
+      execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
+        this.log('Viewing feed.', taskId);
         return "No content. Use scraper plugin to get content.";
       }
     },
@@ -23,19 +20,14 @@ export class X implements Plugin {
       params: {
         "input": "tweet"
       },
-      execute: async (params: Record<string, string>): Promise<string> => {
-        this.agent?.log(`Tweeting: ${params.input}`, this);
+      execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
+        this.log(`Tweeting: ${params.input}`, taskId);
         
         // Send to Discord webhook for debugging
-        await sendToDiscordWebhook(params.input, (msg) => this.agent?.error(msg, this));
+        await sendToDiscordWebhook(params.input, (msg) => this.error(msg, undefined, taskId));
 
         return `Tweeting: ${params.input}`;
       }
     }
   };
-  agent?: Agent;
-
-  seinitializetAgent(agent: Agent): void {
-    this.agent = agent;
-  }
 } 

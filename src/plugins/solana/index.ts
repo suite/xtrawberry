@@ -1,7 +1,7 @@
-import { Agent } from '../../agent';
-import type { Command, Plugin } from '../../types';
+import type { Command } from '../../types';
+import { BasePlugin } from '../../types/base-plugin';
 
-export class SolanaPlugin implements Plugin {
+export class SolanaPlugin extends BasePlugin {
   name = 'solana';
   commands: Record<string, Command> = {
     CREATE_WALLET: {
@@ -9,15 +9,9 @@ export class SolanaPlugin implements Plugin {
       description: 'Creates a new wallet',
       params: {},
       execute: async (params: Record<string, string>, taskId: string): Promise<string> => {
-        this.agent?.log(`[${taskId}] Creating wallet`, this);
+        this.log('Creating wallet', taskId);
         return "";
       }
     }
   };
-  agent?: Agent;
-
-  initialize(agent: Agent): void {
-    this.agent = agent;
-  }
-
 } 
