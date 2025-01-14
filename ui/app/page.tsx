@@ -123,17 +123,23 @@ export default function Home() {
                 </span>
               )}
             </div>
-            <div className="space-y-1.5">
+            {!card.isSystemMessage && (
+              <div className="mb-3 text-sm text-gray-300 bg-gray-800/30 p-3 rounded leading-relaxed border-l-2 border-gray-600">
+                Running task... Fill this out!
+              </div>
+            )}
+            <div className="space-y-1.5 bg-black/50 p-3 rounded font-mono text-sm">
               {card.messages.map((msg, i) => (
-                <div key={i} className="text-sm flex items-start">
+                <div key={i} className="flex items-start hover:bg-black/30 px-2 py-1 rounded">
                   <span className={`font-medium shrink-0 ${
                     msg.type === 'error' ? 'text-red-400' :
                     msg.type === 'warning' ? 'text-yellow-400' :
-                    'text-gray-300'
+                    msg.type === 'success' ? 'text-green-400' :
+                    'text-blue-400'
                   }`}>
                     [{msg.type}]
                   </span>
-                  <span className="text-gray-100 ml-2 break-words flex-1">{msg.message}</span>
+                  <span className="text-gray-100 ml-2 break-words flex-1 font-mono">{msg.message}</span>
                 </div>
               ))}
             </div>
