@@ -376,6 +376,8 @@ export class Agent {
 
     const response = await this.ai.sendMessage(conversationId, message);
     this.debug(`AI response: ${response}`);
+
+    // TODO: use response somewhere in the ui
     
     const newTasks = this.parseNewTasks(response);
     await this.processNewTasks(newTasks, task.id);
