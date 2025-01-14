@@ -126,10 +126,11 @@ export class Agent {
     }
   }
 
+  // TODO: move to log util
   private logMessage(level: 'log' | 'debug' | 'warn' | 'error', message: string, err?: any, plugin?: Plugin, taskId: string = '-1') {
     if (level !== 'log' && !this.config.debug) return;
 
-    const pluginName = plugin?.name || 'agent';
+    const pluginName = plugin?.name || `agent - ${this.currentPersona.name}`;
     const logPrefix = `[${pluginName}] [${taskId}]`;
     
     switch (level) {
@@ -303,17 +304,17 @@ export class Agent {
   private async executePluginCommand(task: Task): Promise<void> {
     if (!task.command || !task.plugin) return;
 
-    this.log(`[${task.id}] Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
+    this.log(`Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
     
     try {
       task.command.response = await task.command.execute(task.command.params, task.id);
       task.command.hasExecuted = true;
       task.command.status = 'success';
-      this.log(`[${task.id}] Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
+      this.log(`Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
     } catch (error) {
       task.command.status = 'failed';
       task.command.response = `Error: ${error}`;
-      this.log(`[${task.id}] Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
+      this.log(`Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
     }
   }
 
@@ -347,7 +348,7 @@ export class Agent {
         );
 
         if (isDuplicate) {
-          this.log(`[${taskId}] Duplicate task found, skipping: ${newTask.description}`, undefined, taskId);
+          this.log(`Duplicate task found, skipping: ${newTask.description}`, undefined, taskId);
           continue;
         }
       }
@@ -356,13 +357,13 @@ export class Agent {
     }
 
     if(tasksToAdd.length > 0) {
-      this.log(`[${taskId}] Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`, undefined, taskId);
+      this.log(`Adding new tasks: ${tasksToAdd.map(t => t.description).join(', ')}`, undefined, taskId);
       tasksToAdd.forEach(newTask => this.addTask(newTask));
     }
   }
 
   private async executeTask(task: Task): Promise<void> {
-    this.log(`[${task.id}] Executing task: ${task.description}`, undefined, task.id);
+    this.log(`Executing task: ${task.description}`, undefined, task.id);
     task.status = 'in_progress';
 
     await this.executePluginCommand(task);
@@ -371,17 +372,17 @@ export class Agent {
     this.ai.createConversation(conversationId, task.id);
 
     const message = this.getTaskContext(task);
-    this.debug(`[${task.id}] Sending message to AI: ${message}`);
+    this.debug(`Sending message to AI: ${message}`);
 
     const response = await this.ai.sendMessage(conversationId, message);
-    this.debug(`[${task.id}] AI response: ${response}`);
+    this.debug(`AI response: ${response}`);
     
     const newTasks = this.parseNewTasks(response);
     await this.processNewTasks(newTasks, task.id);
 
     task.status = 'completed';
     this.debug(`Completed task ${task.id}`); 
-    this.log(`[${task.id}] Completed task`, undefined, task.id);
+    this.log(`Completed task`, undefined, task.id);
   }
 
   private createHistoryAnalysisTask(): void {
