@@ -26,7 +26,7 @@ export interface Plugin {
   name: string;
   commands: Record<string, Command>;
   agent?: Agent;
-  setAgent(agent: Agent): void;
+  initialize(agent: Agent): void;
 }
 
 export interface AgentPersona {

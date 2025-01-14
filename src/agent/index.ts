@@ -28,20 +28,6 @@ NEVER ASK QUESTIONS FROM THE USER.
 TRY NOT TO CREATE TOO MANY TASKS AT ONCE. FOCUS ON ONE TASK AT A TIME. WAIT FOR RESULTS FROM THE PREVIOUS TASK TO BECOME AVAILABLE BEFORE CREATING A NEW TASK.
 `;
 
-/*
-<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL">Print LOL to the console</TASK>
-=
-<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
-
-<TASK PLUGIN="demo" COMMAND="PRINT" PARAMS="input=LOL,example=DERP">Print LOL to the console</TASK>
-=
-<TASK> <PLUGIN>demo</PLUGIN> <COMMAND>PRINT</COMMAND> <PARAMS><input>LOL</input><example>DERP</example></PARAMS> <DESCRIPTION>Print LOL to the console</DESCRIPTION> </TASK>
-
-
-<TASK>task description</TASK>
-=
-<TASK> <DESCRIPTION>task description</DESCRIPTION> </TASK>
-*/
 export const PERSONAS: Record<string, AgentPersona> = {
   SOLANA_TRADER: {
     name: 'Solana Trader',
@@ -119,7 +105,7 @@ export class Agent {
     this.PLUGIN_CONTEXT = `${GLOBAL_AVAILABLE_COMMANDS}`;
 
     this.config.plugins.forEach(plugin => {
-      plugin.setAgent(this);
+      plugin.initialize(this);
 
       const commandsXml = Object.entries(plugin.commands)
         .map(([name, cmd]) => {
@@ -443,3 +429,9 @@ agent.start().catch(console.error);
 // TODO:
 // clean up
 // send message to ui of what AI is thinking
+// implement twitter plugin
+// - view feed
+// - search
+// - tweet/reply
+// - follow
+// - tweet

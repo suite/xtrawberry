@@ -3,6 +3,9 @@ import type { Command, Plugin } from '../../types';
 import { sendToDiscordWebhook } from '../../utils/discord';
 
 export class X implements Plugin {
+  initialize(agent: Agent): void {
+    throw new Error('Method not implemented.');
+  }
   name = 'x';
   commands: Record<string, Command> = {
     VIEW_FEED: {
@@ -32,7 +35,7 @@ export class X implements Plugin {
   };
   agent?: Agent;
 
-  setAgent(agent: Agent): void {
+  seinitializetAgent(agent: Agent): void {
     this.agent = agent;
   }
 } 

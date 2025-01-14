@@ -51,7 +51,7 @@ export class ScraperPlugin implements Plugin {
   };
   agent?: Agent;
 
-  setAgent(agent: Agent): void {
+  initialize(agent: Agent): void {
     this.agent = agent;
   }
 } 
