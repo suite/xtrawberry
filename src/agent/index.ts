@@ -375,7 +375,7 @@ export class Agent {
     this.debug(`Sending message to AI: ${message}`);
 
     const response = await this.ai.sendMessage(conversationId, message);
-    this.debug(`AI response: ${response}`);
+    this.log(`AI response: ${response}`, undefined, task.id);
 
     // TODO: use response somewhere in the ui
     
@@ -433,7 +433,7 @@ export class Agent {
 
 const config: AgentConfig = {
   plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],  
-  persona: PERSONAS.PLUGIN_DEMO,
+  persona: PERSONAS.X_DEGEN,
   debug: true,
   ws: true
 };
@@ -458,3 +458,5 @@ agent.start().catch(console.error);
 // - tweet/reply
 // - follow
 // - tweet
+
+// scraper seems to be horrible (use brave api?)
