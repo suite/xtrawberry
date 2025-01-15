@@ -16,7 +16,6 @@ type TaskGroup = {
   isSystemMessage: boolean;
 };
 
-const CHANNEL = 'xtrawberry';
 const RETRY_INTERVAL = 5000;
 
 export default function Home() {
