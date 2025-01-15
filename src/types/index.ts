@@ -26,7 +26,7 @@ export interface Plugin {
   name: string;
   commands: Record<string, Command>;
   agent?: Agent;
-  initialize(agent: Agent): void;
+  initialize(agent: Agent): Promise<void>;
 }
 
 export interface AgentPersona {

@@ -57,7 +57,7 @@ Respond with your thoughts and explicitly state any new tasks that should be cre
     name: 'X Degen',
     context: `PERSONALITY: You are a seasoned Solana trader with deep market knowledge. You maintain a calculated, reserved demeanor while being absolutely certain in your analysis. You prefer to keep a low profile but when you speak, your expertise is evident. Your statements are measured, direct, and carry the weight of experience.
 
-Your purpose is research new SOL projects to invest in. Use the scraper plugin to research and find the best SOL projects to invest in. Once you've done enough research about a project, tweet about it in your signature degen style - short, hype, with lots of conviction. 
+Your purpose is research new SOL projects to invest in. Use the scraper plugin and X plugin to research and find the best SOL projects to invest in. Once you've done enough research about a project, tweet about it in your signature degen style - short, hype, with lots of conviction. 
 
 TWEET STYLE:
 "$ticker looks pretty good"
@@ -80,7 +80,7 @@ NO EMOJIS.
 
 IF YOU NOTICE YOURSELF RESEARCHING THE SAME PROJECT OVER AND OVER, STOP RESEARCHING THAT PROJECT AND THINK OF A NEW PROJECT TO RESEARCH.
 DERIVIVE THINGS FROM CONTEXT. SEARCH THINGS UP IF NEEDED.`,
-    initialTaskDescription: "gm frens, time to find some alpha. let's see what's pumping and find the next 100x gem 💎"
+    initialTaskDescription: "Search X for what's going on in the Solana space for today. Find the best SOL projects to invest in."
   }
 };
 
@@ -89,7 +89,7 @@ export class Agent {
   private isRunning: boolean = false;
   private tasks: Task[] = [];
   private ai: AI;
-  private PLUGIN_CONTEXT: string;
+  private PLUGIN_CONTEXT: string = '';
   private currentPersona: AgentPersona;
   private readonly COMMAND_HISTORY_AMOUNT = 5;
   private readonly TASK_HISTORY_AMOUNT = 3;
@@ -101,19 +101,25 @@ export class Agent {
     this.ai = new AI();
     this.currentPersona = config.persona || PERSONAS.SOLANA_TRADER;
     this.currentPersona.context = `${this.currentPersona.context}\n\n${GLOBAL_CONTEXT}`;
+  }
 
+  private async init() {
     this.PLUGIN_CONTEXT = `${GLOBAL_AVAILABLE_COMMANDS}`;
 
-    this.config.plugins.forEach(plugin => {
-      plugin.initialize(this);
+    await Promise.all(this.config.plugins.map(plugin => 
+      plugin.initialize(this).then(() => {
+        const commandsXml = Object.entries(plugin.commands)
+          .map(([name, cmd]) => formatPluginAsXml(plugin, name, cmd.params, cmd.description))
+          .join('\n');
+        this.PLUGIN_CONTEXT += `\n${commandsXml}`;
 
-      const commandsXml = Object.entries(plugin.commands)
-        .map(([name, cmd]) => formatPluginAsXml(plugin, name, cmd.params, cmd.description))
-        .join('\n');
-      this.PLUGIN_CONTEXT += `\n${commandsXml}`;
-    });
+        this.log(`Initialized plugin ${plugin.name}`);
+      }).catch(err => {
+        this.error(`Failed to initialize plugin ${plugin.name}, will not use.`, err);
+      })
+    ));
     
-    const initialTask: NewTask = {
+    const initialTask: NewTask = { 
       description: this.currentPersona.initialTaskDescription
     };
     this.addTask(initialTask);
@@ -400,7 +406,7 @@ export class Agent {
     this.ai.createConversation(conversationId, task.id);
 
     const message = this.getTaskContext(task);
-    this.debug(`Sending message to AI: ${message}`);
+    this.debug(`Sending message to AI: ${message}`, undefined, task.id);
 
     const response = await this.ai.sendMessage(conversationId, message);
     this.log(`AI response: ${response}`, undefined, task.id);
@@ -413,6 +419,8 @@ export class Agent {
   }
 
   async start() {
+    await this.init();
+
     this.isRunning = true;
     this.debug('Agent starting...');
     
@@ -441,7 +449,7 @@ export class Agent {
 }
 
 const config: AgentConfig = {
-  plugins: [new Demo(), new ScraperPlugin(), new SolanaPlugin(), new X()],  
+  plugins: [new Demo(), new SolanaPlugin(), new X()],  
   persona: PERSONAS.X_DEGEN,
   debug: true,
   ws: true
@@ -457,15 +465,3 @@ process.on('SIGINT', () => {
 
 // Start the agent
 agent.start().catch(console.error); 
-
-// TODO:
-// clean up
-// send message to ui of what AI is thinking
-// implement twitter plugin
-// - view feed
-// - search
-// - tweet/reply
-// - follow
-// - tweet
-
-// scraper seems to be horrible (use brave api?)

@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.33.1",
-    "@tavily/core": "^0.0.2"
+    "@tavily/core": "^0.0.2",
+    "agent-twitter-client": "git://github.com/suite/agent-twitter-client#main"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@types/node": "^20.10.5",
     "bun-types": "latest",
-    "@types/node": "^20.10.5"
+    "typescript": "^5.3.3"
   }
 }
