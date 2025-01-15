@@ -123,11 +123,6 @@ export default function Home() {
                 </span>
               )}
             </div>
-            {!card.isSystemMessage && (
-              <div className="mb-3 text-sm text-gray-300 bg-gray-800/30 p-3 rounded leading-relaxed border-l-2 border-gray-600">
-                Running task... Fill this out!
-              </div>
-            )}
             <div className="space-y-1.5 bg-black/50 p-3 rounded font-mono text-sm">
               {card.messages.map((msg, i) => (
                 <div key={i} className="flex items-start hover:bg-black/30 px-2 py-1 rounded">
