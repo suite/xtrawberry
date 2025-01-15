@@ -2,6 +2,7 @@ import type { AgentConfig, AgentPersona, NewTask, Plugin, Task } from '../types'
 import { AI } from './ai';
 import { WSServer } from '../ws';
 import { Demo, ScraperPlugin, SolanaPlugin, X } from '../plugins';
+import { formatPluginAsXml, formatTaskAsXml } from '../utils/xml';
 
 const GLOBAL_AVAILABLE_COMMANDS = '<BEGIN Available commands>';
 
@@ -90,8 +91,10 @@ export class Agent {
   private ai: AI;
   private PLUGIN_CONTEXT: string;
   private currentPersona: AgentPersona;
-  private readonly COMMAND_HISTORY_AMOUNT = 5; // Keep track of last 5 commands
-  private readonly TASK_AMOUNT = 5; // Maximum number of pending tasks allowed
+  private readonly COMMAND_HISTORY_AMOUNT = 5;
+  private readonly TASK_HISTORY_AMOUNT = 3;
+  private readonly TASK_AMOUNT = 5;
+  private readonly AGENT_WAIT_TIME = 5000;
 
   constructor(config: AgentConfig) {
     this.config = { debug: false, ws: false, ...config };
@@ -105,12 +108,7 @@ export class Agent {
       plugin.initialize(this);
 
       const commandsXml = Object.entries(plugin.commands)
-        .map(([name, cmd]) => {
-          const paramsXml = Object.entries(cmd.params)
-            .map(([paramName, defaultValue]) => `<${paramName}>${defaultValue}</${paramName}>`)
-            .join('');
-          return `<TASK> <PLUGIN>${plugin.name}</PLUGIN> <COMMAND>${name}</COMMAND> <PARAMS>${paramsXml}</PARAMS> <DESCRIPTION>${cmd.description}</DESCRIPTION> </TASK>`;
-        })
+        .map(([name, cmd]) => formatPluginAsXml(plugin, name, cmd.params, cmd.description))
         .join('\n');
       this.PLUGIN_CONTEXT += `\n${commandsXml}`;
     });
@@ -279,11 +277,20 @@ export class Agent {
     this.tasks.push(newTask);
   }
 
-  private formatTaskAsXml(task: Task): string {
-    if (task.plugin && task.command) {
-      return `<TASK> <PLUGIN>${task.plugin.name}</PLUGIN> <COMMAND>${task.command.name}</COMMAND> <PARAMS>${Object.entries(task.command.params).map(([k,v]) => `<${k}>${v}</${k}>`).join('')}</PARAMS> <DESCRIPTION>${task.description}</DESCRIPTION> </TASK>`;
-    }
-    return `<TASK> <DESCRIPTION>${task.description}</DESCRIPTION> </TASK>`;
+  private createHistoryAnalysisTask(): void {
+    const lastCompletedTasks = this.tasks
+      .filter(t => t.status === 'completed')
+      .slice(-this.TASK_HISTORY_AMOUNT);
+    
+    const tasksContext = lastCompletedTasks
+      .map(t => `Task ${t.id}: ${t.description}\nContext: ${t.context || 'No context'}`)
+      .join('\n\n');
+
+    const historyAnalysisTask: NewTask = {
+      description: "Analyze previous tasks and determine next steps",
+      context: `Review the last ${lastCompletedTasks.length} completed tasks and their outcomes to determine the next strategic steps.\n\nPrevious tasks summary:\n${tasksContext}`
+    };
+    this.addTask(historyAnalysisTask);
   }
 
   private getCommandHistory(): string {
@@ -294,45 +301,49 @@ export class Agent {
     if (recentTasks.length === 0) return 'NO COMMAND HISTORY';
 
     return recentTasks.map(t => {
-      const taskXml = this.formatTaskAsXml(t);
+      const taskXml = formatTaskAsXml(t);
       const status = t.command?.status || 'unknown';
       const response = t.command?.response || 'no response';
       return `- Task ${t.id}: ${taskXml}\n  Status: ${status}\n  Response: ${response}`;
     }).join('\n\n');
   }
 
-  private async executePluginCommand(task: Task): Promise<void> {
-    if (!task.command || !task.plugin) return;
-
-    this.log(`Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
-    
-    try {
-      task.command.response = await task.command.execute(task.command.params, task.id);
-      task.command.hasExecuted = true;
-      task.command.status = 'success';
-      this.log(`Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
-    } catch (error) {
-      task.command.status = 'failed';
-      task.command.response = `Error: ${error}`;
-      this.log(`Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
-    }
-  }
-
   private getTaskContext(task: Task): string {
     const pendingTasks = this.tasks.filter(t => t.status === 'pending' && t.id !== task.id);
+    const pendingTasksString = pendingTasks.map(t => `- Task ${t.id}: ${formatTaskAsXml(t)}`).join('\n');
+    
+    const warningMessage = pendingTasks.length >= this.TASK_AMOUNT 
+      ? 'TOO MANY PENDING TASKS. LET THESE RUN FIRST! ' + 
+        'DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.\n\n'
+      : '';
+    
     const pendingTasksInfo = pendingTasks.length > 0 
-      ? `${pendingTasks.length >= this.TASK_AMOUNT ? 'TOO MANY PENDING TASKS. LET THESE RUN FIRST! DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.\n\n' : ''}${pendingTasks.map(t => `- Task ${t.id}: ${this.formatTaskAsXml(t)}`).join('\n')}`
+      ? `${warningMessage}${pendingTasksString}`
       : 'NO PENDING TASKS';
 
     const commandHistory = pendingTasks.length >= this.TASK_AMOUNT 
-      ? 'TOO MANY PENDING TASKS. HIDING COMMAND HISTORY. DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.' 
+      ? 'TOO MANY PENDING TASKS. HIDING COMMAND HISTORY. ' +
+        'DO NOT CREATE ANY MORE TASKS UNLESS ABSOLUTELY NECESSARY.' 
       : this.getCommandHistory();
 
-    return `${this.currentPersona.context}\n\n${this.PLUGIN_CONTEXT}\n\n${
-      task.id === '1' 
-        ? `Your first task: ${task.description}`
-        : `Current task: ${task.description}${task.context ? `\n\nContext from previous task: ${task.context}` : ''}`
-    }\n\nCurrently pending tasks:\n${pendingTasksInfo}\n\nRecent command history:\n${commandHistory}\n\nPlease consider these pending tasks and command history when creating new tasks to avoid duplication or repeating patterns.`;
+    const taskDescription = task.id === '1'
+      ? `Your first task: ${task.description}`
+      : `Current task: ${task.description}${
+          task.context 
+            ? `\n\nContext from previous task: ${task.context}` 
+            : ''
+        }`;
+
+    return [
+      this.currentPersona.context,
+      this.PLUGIN_CONTEXT,
+      taskDescription,
+      'Currently pending tasks:',
+      pendingTasksInfo,
+      'Recent command history:',
+      commandHistory,
+      'Please consider these pending tasks and command history when creating new tasks to avoid duplication or repeating patterns.'
+    ].join('\n\n');
   }
 
   private async processNewTasks(newTasks: NewTask[], taskId: string): Promise<void> {
@@ -362,6 +373,23 @@ export class Agent {
     }
   }
 
+  private async executePluginCommand(task: Task): Promise<void> {
+    if (!task.command || !task.plugin) return;
+
+    this.log(`Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
+    
+    try {
+      task.command.response = await task.command.execute(task.command.params, task.id);
+      task.command.hasExecuted = true;
+      task.command.status = 'success';
+      this.log(`Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
+    } catch (error) {
+      task.command.status = 'failed';
+      task.command.response = `Error: ${error}`;
+      this.log(`Error executing command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
+    }
+  }
+
   private async executeTask(task: Task): Promise<void> {
     this.log(`Executing task: ${task.description}`, undefined, task.id);
     task.status = 'in_progress';
@@ -376,31 +404,12 @@ export class Agent {
 
     const response = await this.ai.sendMessage(conversationId, message);
     this.log(`AI response: ${response}`, undefined, task.id);
-
-    // TODO: use response somewhere in the ui
     
     const newTasks = this.parseNewTasks(response);
     await this.processNewTasks(newTasks, task.id);
 
     task.status = 'completed';
-    this.debug(`Completed task ${task.id}`); 
     this.log(`Completed task`, undefined, task.id);
-  }
-
-  private createHistoryAnalysisTask(): void {
-    const lastCompletedTasks = this.tasks
-      .filter(t => t.status === 'completed')
-      .slice(-3);
-    
-    const tasksContext = lastCompletedTasks
-      .map(t => `Task ${t.id}: ${t.description}\nContext: ${t.context || 'No context'}`)
-      .join('\n\n');
-
-    const historyAnalysisTask: NewTask = {
-      description: "Analyze previous tasks and determine next steps",
-      context: `Review the last ${lastCompletedTasks.length} completed tasks and their outcomes to determine the next strategic steps.\n\nPrevious tasks summary:\n${tasksContext}`
-    };
-    this.addTask(historyAnalysisTask);
   }
 
   async start() {
@@ -417,8 +426,8 @@ export class Agent {
         this.createHistoryAnalysisTask();
       }
 
-      this.debug(`Waiting for 5 seconds`);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      this.debug(`Waiting for ${this.AGENT_WAIT_TIME}ms`);
+      await new Promise(resolve => setTimeout(resolve, this.AGENT_WAIT_TIME));
     }
   }
 
