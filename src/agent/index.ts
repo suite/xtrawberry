@@ -248,7 +248,8 @@ export class Agent {
           command: {
             name: command,
             params: parsedParams,
-            execute: plugin.commands[command].execute
+            execute: plugin.commands[command].execute,
+            status: 'pending'
           },
           plugin
         };
@@ -301,7 +302,7 @@ export class Agent {
 
   private getCommandHistory(): string {
     const recentTasks = this.tasks
-      .filter(t => t.command?.hasExecuted)
+      .filter(t => t.command?.status !== 'pending')
       .slice(-this.COMMAND_HISTORY_AMOUNT);
 
     if (recentTasks.length === 0) return 'NO COMMAND HISTORY';
@@ -361,7 +362,7 @@ export class Agent {
           existingTask.plugin?.name === newTask.plugin?.name &&
           existingTask.command?.name === newTask.command?.name &&
           existingTask.description === newTask.description &&
-          existingTask.command?.hasExecuted !== true
+          existingTask.command?.status === 'pending'
         );
 
         if (isDuplicate) {
@@ -383,10 +384,9 @@ export class Agent {
     if (!task.command || !task.plugin) return;
 
     this.log(`Executing command: ${task.command.name} with params: ${Object.entries(task.command.params).map(([k,v]) => `${k}=${v}`).join(',')}`, undefined, task.id);
-    
+
     try {
       task.command.response = await task.command.execute(task.command.params, task.id);
-      task.command.hasExecuted = true;
       task.command.status = 'success';
       this.log(`Successfully executed command ${task.plugin.name} ${task.command.name}`, undefined, task.id);
     } catch (error) {

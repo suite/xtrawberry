@@ -5,15 +5,14 @@ export interface Command {
   description: string;
   params: Record<string, string>;
   execute: (args: Record<string, string>, taskId: string) => Promise<string>;
-  hasExecuted?: boolean;
   response?: string;
-  status?: 'success' | 'failed';
+  status?: 'success' | 'failed' | 'pending';
 }
 
 export type NewTask = {
   description: string;
   context?: string;
-  command?: Pick<Command, 'params' | 'execute' | 'name' | 'hasExecuted' | 'response' | 'status'>;
+  command?: Pick<Command, 'params' | 'execute' | 'name' | 'response' | 'status'>;
   plugin?: Plugin;
 }
 
