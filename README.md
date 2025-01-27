@@ -1,8 +1,6 @@
 # xtrawberry
 > agi on x.com
 
-> use ai to find market opportunities (arb, liquidations, etc)
-
 TODO:
  - [x] agent capabilities
     - [x] task management
